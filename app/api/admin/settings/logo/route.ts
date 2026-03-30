@@ -1,0 +1,47 @@
+import { NextResponse } from "next/server";
+import { getAdminSession } from "@/lib/admin-api";
+import { getSiteLogoUrl, setSiteLogoUrl } from "@/lib/site-settings";
+import { isRedisConfigured } from "@/lib/redis";
+
+export async function GET() {
+  if (!(await getAdminSession())) {
+    return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+  }
+
+  const url = await getSiteLogoUrl();
+  return NextResponse.json({ url, redis: isRedisConfigured() });
+}
+
+export async function POST(req: Request) {
+  if (!(await getAdminSession())) {
+    return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+  }
+
+  if (!isRedisConfigured()) {
+    return NextResponse.json({ error: "Redis gerekli" }, { status: 503 });
+  }
+
+  let body: { url?: string | null };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Geçersiz JSON" }, { status: 400 });
+  }
+
+  const raw = body.url;
+  if (raw === null || raw === "" || raw === undefined) {
+    await setSiteLogoUrl(null);
+    return NextResponse.json({ ok: true, url: null });
+  }
+
+  const u = String(raw).trim();
+  if (!/^https:\/\//i.test(u)) {
+    return NextResponse.json(
+      { error: "Yalnızca https:// ile başlayan mutlak URL kullanın." },
+      { status: 400 },
+    );
+  }
+
+  await setSiteLogoUrl(u);
+  return NextResponse.json({ ok: true, url: u });
+}

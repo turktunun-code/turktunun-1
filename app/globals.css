@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
-:root {
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root,
+html[data-theme="light"] {
+  color-scheme: light;
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000000;
+  --accent: #30d5c8;
+  --card: #ffffff;
+  --card-elevated: #fafafa;
+  --card-border: rgba(0, 0, 0, 0.1);
+  --muted: rgba(0, 0, 0, 0.58);
+  --input-bg: #ffffff;
+  --header-bg: #ffffff;
+  --footer-bg: #ffffff;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b0e11;
+  --foreground: #f4f4f5;
+  --accent: #30d5c8;
+  --card: #12161c;
+  --card-elevated: #171c24;
+  --card-border: rgba(255, 255, 255, 0.09);
+  --muted: rgba(255, 255, 255, 0.62);
+  --input-bg: #0f1318;
+  --header-bg: #0e1217;
+  --footer-bg: #0e1217;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }

@@ -62,6 +62,7 @@ export async function POST(req: Request) {
   }
 
   revalidatePath("/");
+  revalidatePath("/katalog");
   revalidatePath("/oneriler");
 
   return NextResponse.json({ ok: true });

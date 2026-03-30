@@ -53,7 +53,7 @@ export function WelcomeEntry() {
 
             <nav className="mt-8 flex flex-col gap-3" aria-label="Site giriş bağlantıları">
               <Link
-                href="/"
+                href="/katalog"
                 className="flex items-center justify-center rounded-2xl bg-[var(--accent)] py-3.5 text-center text-sm font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 Üye kataloğuna geç

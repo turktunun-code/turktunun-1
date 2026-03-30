@@ -115,10 +115,10 @@ export function CatalogClient({ members, logoSrc = "/logo.png" }: Props) {
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-end">
             <Link
-              href="/giris"
+              href="/"
               className="inline-flex h-10 items-center rounded-full border border-[var(--card-border)] px-4 text-sm font-medium text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--foreground)]"
             >
-              Hoş geldin
+              Giriş sayfası
             </Link>
             <ThemeToggle />
             <Link

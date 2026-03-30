@@ -10,5 +10,6 @@ export async function POST(req: NextRequest) {
   }
 
   revalidatePath("/");
+  revalidatePath("/katalog");
   return NextResponse.json({ ok: true, revalidated: true });
 }

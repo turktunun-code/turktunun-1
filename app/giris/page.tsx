@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
-import { WelcomeEntry } from "@/components/WelcomeEntry";
-import { TAGLINE } from "@/lib/constants";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Hoş geldiniz | Türk Tudun",
-  description: `Türk Tudun üye bilgi platformuna giriş. ${TAGLINE}`,
-};
-
-export default function GirisPage() {
-  return <WelcomeEntry />;
+/** Eski bağlantılar: kök adres artık giriş sayfasıdır. */
+export default function GirisRedirectPage() {
+  redirect("/");
 }

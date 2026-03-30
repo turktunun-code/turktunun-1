@@ -1,10 +1,12 @@
-import { CatalogClient } from "@/components/CatalogClient";
-import { getMembers } from "@/lib/members";
-import { getCatalogLogoSrc } from "@/lib/site-settings";
+import { WelcomeEntry } from "@/components/WelcomeEntry";
+import { TAGLINE } from "@/lib/constants";
+import type { Metadata } from "next";
 
-export const revalidate = 120;
+export const metadata: Metadata = {
+  title: "Hoş geldiniz | Türk Tudun",
+  description: `Türk Tudun üye bilgi platformuna giriş. ${TAGLINE}`,
+};
 
-export default async function Home() {
-  const [members, logoSrc] = await Promise.all([getMembers(), getCatalogLogoSrc()]);
-  return <CatalogClient members={members} logoSrc={logoSrc} />;
+export default function HomePage() {
+  return <WelcomeEntry />;
 }

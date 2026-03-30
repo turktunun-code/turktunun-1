@@ -62,6 +62,7 @@ export async function POST(req: Request) {
   }
 
   revalidatePath("/");
+  revalidatePath("/anasayfa");
   revalidatePath("/katalog");
   revalidatePath("/oneriler");
 

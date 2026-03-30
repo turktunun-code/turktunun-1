@@ -10,7 +10,6 @@ const DEVELOPER_SITE = "https://www.dogukankardas.com";
 export function WelcomeEntry() {
   return (
     <div className="relative min-h-dvh min-h-screen w-full overflow-hidden bg-[#0a1210] text-[var(--foreground)]">
-      {/* Tam çözünürlük: orijinal PNG, build sırasında yeniden örneklenmez */}
       <div className="absolute inset-0">
         <img
           src={HERO_SRC}
@@ -21,7 +20,6 @@ export function WelcomeEntry() {
         />
       </div>
 
-      {/* Okunabilirlik ve tema uyumu */}
       <div
         className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0b1210]/55 via-[#0b1210]/15 to-[#061015]/92 dark:from-black/65 dark:via-black/25 dark:to-black/90"
         aria-hidden
@@ -33,9 +31,7 @@ export function WelcomeEntry() {
 
       <div className="relative z-10 flex min-h-dvh min-h-screen flex-col">
         <header className="flex items-center justify-end gap-3 px-4 py-4 sm:px-8">
-          <span className="mr-auto text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
-            Hoş geldiniz
-          </span>
+          <span className="mr-auto text-xs font-semibold uppercase tracking-[0.25em] text-white/70">Giriş</span>
           <ThemeToggle className="border-white/35 bg-white/12 text-white backdrop-blur-md hover:border-[var(--accent)] hover:text-[var(--accent)]" />
         </header>
 
@@ -53,10 +49,10 @@ export function WelcomeEntry() {
 
             <nav className="mt-8 flex flex-col gap-3" aria-label="Site giriş bağlantıları">
               <Link
-                href="/katalog"
+                href="/anasayfa"
                 className="flex items-center justify-center rounded-2xl bg-[var(--accent)] py-3.5 text-center text-sm font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
-                Üye kataloğuna geç
+                Anasayfa
               </Link>
               <Link
                 href="/kayit"

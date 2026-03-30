@@ -1,5 +1,12 @@
 import seedRaw from "@/data/seed-members.json";
 import { filterPublicMembers, getApprovalMap } from "./approvals";
+import { fetchSheetAsCsvViaApi } from "./google-sheets-api";
+import {
+  effectiveSheetGid,
+  effectiveSheetId,
+  getStoredGoogleSheetRows,
+  resolveServiceAccountCredentials,
+} from "./google-sheet-settings";
 import { memberDedupeKey, type Member } from "./member";
 import { sheetCsvToMembers } from "./parseSheet";
 
@@ -9,17 +16,8 @@ function getSeedMembers(): Member[] {
   return (seedRaw as Member[]).map((m) => ({ ...m, source: "seed" as const }));
 }
 
-function sheetExportUrl(): string | null {
-  const id = process.env.GOOGLE_SHEET_ID?.trim();
-  if (!id) return null;
-  const gid = (process.env.GOOGLE_SHEET_GID ?? "0").trim();
-  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
-}
-
-async function fetchSheetMembers(): Promise<Member[]> {
-  const url = sheetExportUrl();
-  if (!url) return [];
-
+async function fetchPublicCsvExport(sheetId: string, gid: string): Promise<Member[]> {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${encodeURIComponent(gid)}`;
   try {
     const res = await fetch(url, {
       next: { revalidate: Number.isFinite(REVALIDATE_SECONDS) ? REVALIDATE_SECONDS : 120 },
@@ -37,6 +35,26 @@ async function fetchSheetMembers(): Promise<Member[]> {
     console.error("[members] sheet fetch error", e);
     return [];
   }
+}
+
+async function fetchSheetMembers(): Promise<Member[]> {
+  const stored = await getStoredGoogleSheetRows();
+  const sheetId = effectiveSheetId(stored.sheetId);
+  const gid = effectiveSheetGid(stored.gid);
+  if (!sheetId) return [];
+
+  const creds = await resolveServiceAccountCredentials();
+  if (creds) {
+    try {
+      const csv = await fetchSheetAsCsvViaApi(sheetId, gid, creds);
+      if (csv) return sheetCsvToMembers(csv);
+    } catch (e) {
+      console.error("[members] Sheets API error", e);
+    }
+    console.error("[members] Sheets API başarısız; herkese açık CSV deneniyor");
+  }
+
+  return fetchPublicCsvExport(sheetId, gid);
 }
 
 function mergeSheetAndSeed(sheet: Member[], seed: Member[]): Member[] {

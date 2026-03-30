@@ -285,7 +285,7 @@ export function MembershipForm() {
           kataloğunda yayımlanabilir hale gelir.
         </p>
         <Link
-          href="/"
+          href="/anasayfa"
           className="mt-6 inline-flex rounded-full bg-[var(--accent)] px-8 py-3 text-sm font-semibold text-black"
         >
           Ana sayfaya dönüş
@@ -845,7 +845,7 @@ export function MembershipForm() {
           {loading ? "İletiliyor…" : "Başvuruyu ilet"}
         </button>
         <Link
-          href="/"
+          href="/anasayfa"
           className="rounded-full border border-[var(--card-border)] px-6 py-3 text-sm font-medium hover:border-[var(--accent)]"
         >
           İptal
@@ -867,7 +867,7 @@ export function MembershipPageShell({ children }: { children: ReactNode }) {
       <header className="border-b border-[var(--card-border)] bg-[var(--header-bg)]">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4 px-4 py-6">
           <div>
-            <Link href="/" className="text-sm font-medium text-[var(--accent)] hover:underline">
+            <Link href="/anasayfa" className="text-sm font-medium text-[var(--accent)] hover:underline">
               Ana sayfaya dönüş
             </Link>
             <h1 className="mt-2 text-2xl font-bold tracking-tight">Üyelik başvuru formu</h1>

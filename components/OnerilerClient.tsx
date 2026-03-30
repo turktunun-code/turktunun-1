@@ -53,7 +53,7 @@ export function OnerilerClient({ members, initialDemand, initialSector }: Props)
       <header className="border-b border-[var(--card-border)] bg-[var(--header-bg)] transition-colors">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-6">
           <div className="min-w-0">
-            <Link href="/" className="text-sm font-medium text-[var(--accent)] hover:underline">
+            <Link href="/anasayfa" className="text-sm font-medium text-[var(--accent)] hover:underline">
               Ana sayfaya dönüş
             </Link>
             <h1 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">Talep temelli sonuçlar</h1>
@@ -147,7 +147,7 @@ export function OnerilerClient({ members, initialDemand, initialSector }: Props)
               seçimini kaldırmayı deneyiniz.
             </p>
             <Link
-              href="/"
+              href="/anasayfa"
               className="mt-6 inline-flex rounded-full border border-[var(--card-border)] px-6 py-2.5 text-sm font-medium hover:border-[var(--accent)]"
             >
               Katalogda gezin

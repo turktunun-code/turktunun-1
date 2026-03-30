@@ -8,7 +8,7 @@ export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: `Üye kataloğu | Türk Tudun`,
-  description: `Kurumsal üye kataloğu ve sektör filtrelemesi. ${TAGLINE}`,
+  description: `Onaylı üye bilgi kataloğu; arama ve sektör filtrelemesi. ${TAGLINE}`,
 };
 
 export default async function KatalogPage() {

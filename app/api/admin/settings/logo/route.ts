@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin-api";
 import { getSiteLogoUrl, setSiteLogoUrl } from "@/lib/site-settings";
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
   const raw = body.url;
   if (raw === null || raw === "" || raw === undefined) {
     await setSiteLogoUrl(null);
+    revalidatePath("/katalog");
     return NextResponse.json({ ok: true, url: null });
   }
 
@@ -43,5 +45,6 @@ export async function POST(req: Request) {
   }
 
   await setSiteLogoUrl(u);
+  revalidatePath("/katalog");
   return NextResponse.json({ ok: true, url: u });
 }

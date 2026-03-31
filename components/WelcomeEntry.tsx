@@ -46,7 +46,7 @@ export function WelcomeEntry() {
 
         <main className="flex flex-1 flex-col items-center justify-end px-4 pb-10 pt-4 sm:justify-center sm:pb-16 sm:pt-0 lg:items-end lg:pr-12 lg:pb-24">
           <div
-            className="w-full max-w-md rounded-[1.75rem] border border-white/25 bg-white/12 p-8 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.45)] backdrop-blur-2xl dark:border-white/10 dark:bg-black/35 dark:shadow-[0_24px_80px_-12px_rgba(0,0,0,0.6)] sm:p-10"
+            className="w-full max-w-md rounded-[1.75rem] border border-white/20 bg-white/[0.06] p-8 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)] backdrop-blur-md dark:border-white/[0.08] dark:bg-black/20 dark:shadow-[0_24px_80px_-12px_rgba(0,0,0,0.45)] sm:border-white/25 sm:bg-white/12 sm:shadow-[0_24px_80px_-12px_rgba(0,0,0,0.45)] sm:backdrop-blur-2xl sm:dark:border-white/10 sm:dark:bg-black/35 sm:dark:shadow-[0_24px_80px_-12px_rgba(0,0,0,0.6)] sm:p-10"
             role="region"
             aria-label="Türk Tudun giriş seçenekleri"
           >

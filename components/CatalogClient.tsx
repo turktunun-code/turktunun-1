@@ -279,7 +279,7 @@ export function CatalogClient({ members, logoSrc }: Props) {
               {members.length !== filtered.length && ` (yayında toplam ${members.length} kayıt)`}
             </p>
 
-            <ul className="grid gap-4 overflow-visible sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid items-start gap-4 overflow-visible sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((m, i) => (
                 <li className="min-h-0 overflow-visible" key={`${memberDedupeKey(m)}-${i}`}>
                   <MemberHoverCard m={m} />

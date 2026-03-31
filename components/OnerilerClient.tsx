@@ -125,7 +125,7 @@ export function OnerilerClient({ members, initialDemand, initialSector }: Props)
                 Havuz: {pool.length} kayıt — uyumluluk skoruna göre sıralı
               </span>
             </div>
-            <ul className="grid gap-4 overflow-visible sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid items-start gap-4 overflow-visible sm:grid-cols-2 lg:grid-cols-3">
               {ranked.map(({ member: m, score }, i) => (
                 <li className="min-h-0 overflow-visible" key={`${memberDedupeKey(m)}-${i}`}>
                   <MemberHoverCard

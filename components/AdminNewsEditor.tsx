@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { parseAdminApiResponse } from "@/lib/admin-fetch";
 import type { HomeNewsItem } from "@/lib/home-content";
 
 const inputClass =
@@ -9,11 +10,11 @@ const inputClass =
 type Props = {
   initialItems: HomeNewsItem[];
   canSave: boolean;
-  fromRedis: boolean;
+  hasPersistedOverride: boolean;
   onSaved: () => void;
 };
 
-export function AdminNewsEditor({ initialItems, canSave, fromRedis, onSaved }: Props) {
+export function AdminNewsEditor({ initialItems, canSave, hasPersistedOverride, onSaved }: Props) {
   const [items, setItems] = useState<HomeNewsItem[]>(initialItems);
   const [saving, setSaving] = useState(false);
 
@@ -43,17 +44,18 @@ export function AdminNewsEditor({ initialItems, canSave, fromRedis, onSaved }: P
       const res = await fetch("/api/admin/home-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ news: items }),
       });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        alert(j.error ?? "Kaydedilemedi.");
+      const parsed = await parseAdminApiResponse(res);
+      if (!parsed.ok) {
+        alert(parsed.error ?? "Kaydedilemedi.");
         return;
       }
       onSaved();
       alert("Haberler kaydedildi.");
-    } catch {
-      alert("İstek başarısız.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ağ hatası. Bağlantınızı kontrol edin.");
     } finally {
       setSaving(false);
     }
@@ -68,17 +70,18 @@ export function AdminNewsEditor({ initialItems, canSave, fromRedis, onSaved }: P
       const res = await fetch("/api/admin/home-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ resetNews: true }),
       });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        alert(j.error ?? "İşlem başarısız.");
+      const parsed = await parseAdminApiResponse(res);
+      if (!parsed.ok) {
+        alert(parsed.error ?? "İşlem başarısız.");
         return;
       }
       onSaved();
       alert("Haberler varsayılan içeriğe alındı.");
-    } catch {
-      alert("İstek başarısız.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ağ hatası.");
     } finally {
       setSaving(false);
     }
@@ -88,15 +91,15 @@ export function AdminNewsEditor({ initialItems, canSave, fromRedis, onSaved }: P
     <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
       <h2 className="text-lg font-semibold">Haber içerikleri</h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Kaydettiğinizde liste Redis’te veya yerelde{" "}
+        Kaydettiğinizde liste Supabase&apos;te veya yerelde{" "}
         <code className="rounded bg-black/10 px-1 font-mono text-[11px] dark:bg-white/10">HOME_CONTENT_FILE=true</code> ise{" "}
-        <code className="font-mono text-[11px]">data/home-content.json</code> içinde tutulur; anasayfa buradan okur. Boş
-        başlık veya özet kabul edilmez.
+        <code className="font-mono text-[11px]">data/home-content.json</code> içinde tutulur. Boş başlık veya özet kabul
+        edilmez.
       </p>
       <p className="mt-2 text-xs text-[var(--muted)]">
         Şu anki kaynak:{" "}
         <strong className="text-[var(--foreground)]">
-          {fromRedis ? "Kayıtlı içerik (Redis veya dosya)" : "lib/home-content.ts varsayılanı"}
+          {hasPersistedOverride ? "Kayıtlı içerik (Supabase veya dosya)" : "lib/home-content.ts varsayılanı"}
         </strong>
       </p>
 
@@ -168,7 +171,7 @@ export function AdminNewsEditor({ initialItems, canSave, fromRedis, onSaved }: P
         <button
           type="button"
           onClick={() => void resetDefaults()}
-          disabled={!canSave || saving || !fromRedis}
+          disabled={!canSave || saving || !hasPersistedOverride}
           className="rounded-full border border-[var(--card-border)] px-5 py-2.5 text-sm font-medium hover:border-amber-500/50 disabled:opacity-50"
         >
           Varsayılana dön

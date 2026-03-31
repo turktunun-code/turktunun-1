@@ -1,32 +1,80 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DemandChatbot } from "@/components/DemandChatbot";
+import { InlineCatalogLogo } from "@/components/InlineCatalogLogo";
 import { MemberHoverCard } from "@/components/MemberHoverCard";
-import { FORM_URL, TAGLINE } from "@/lib/constants";
+import { DEFAULT_CATALOG_LOGO, TAGLINE } from "@/lib/constants";
 import { memberDedupeKey, type Member } from "@/lib/member";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Props = {
   members: Member[];
-  logoSrc?: string;
+  /** Özel logo URL veya yerel varsayılan yol (`DEFAULT_CATALOG_LOGO`). */
+  logoSrc: string;
 };
 
 function CatalogLogo({ src }: { src: string }) {
-  const remote = src.startsWith("http://") || src.startsWith("https://");
-  const cls =
-    "h-28 w-28 shrink-0 object-contain drop-shadow-sm dark:drop-shadow-[0_0_20px_rgba(48,213,200,0.25)]";
-  if (remote) {
-    return <img src={src} alt="Türk Tudun" className={cls} referrerPolicy="no-referrer" />;
+  const trimmed = (src || "").trim();
+  const isRemote = /^https?:\/\//i.test(trimmed);
+  const isDefaultPath = trimmed.length === 0 || trimmed === DEFAULT_CATALOG_LOGO;
+  const [remoteFailed, setRemoteFailed] = useState(false);
+  const [localFailed, setLocalFailed] = useState(false);
+
+  useEffect(() => {
+    setRemoteFailed(false);
+    setLocalFailed(false);
+  }, [src]);
+
+  const cls = "h-28 w-28 shrink-0 object-contain";
+  const inlineFallback = <InlineCatalogLogo className={cls} aria-hidden />;
+
+  const defaultPng = (
+    <img
+      src={DEFAULT_CATALOG_LOGO}
+      alt="Türk Tudun"
+      className={cls}
+      onError={() => setLocalFailed(true)}
+    />
+  );
+
+  if (isRemote) {
+    if (!remoteFailed) {
+      return (
+        <img
+          src={trimmed}
+          alt="Türk Tudun"
+          className={cls}
+          referrerPolicy="no-referrer"
+          onError={() => setRemoteFailed(true)}
+        />
+      );
+    }
+    return localFailed ? inlineFallback : defaultPng;
   }
-  return <Image src={src} alt="Türk Tudun" width={120} height={120} className={cls} priority />;
+
+  if (isDefaultPath) {
+    return localFailed ? inlineFallback : defaultPng;
+  }
+
+  if (localFailed) {
+    return inlineFallback;
+  }
+
+  return (
+    <img
+      src={trimmed}
+      alt="Türk Tudun"
+      className={cls}
+      onError={() => setLocalFailed(true)}
+    />
+  );
 }
 
 const CATALOG_SESSION_KEY = "tt_catalog_open";
 
-export function CatalogClient({ members, logoSrc = "/logo.png" }: Props) {
+export function CatalogClient({ members, logoSrc }: Props) {
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState("");
   const [listVisible, setListVisible] = useState(false);
@@ -122,8 +170,13 @@ export function CatalogClient({ members, logoSrc = "/logo.png" }: Props) {
 
   return (
     <div className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)] transition-colors">
-      <header className="border-b border-[var(--card-border)] bg-[var(--header-bg)] transition-colors">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+      <DemandChatbot sectorFilter={sector} />
+      <header className="relative overflow-hidden border-b border-[var(--card-border)] bg-[var(--header-bg)] transition-colors">
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_15%_-10%,rgba(48,213,200,0.18),transparent_52%),radial-gradient(circle_at_85%_15%,rgba(48,213,200,0.1),transparent_38%)] dark:bg-[radial-gradient(ellipse_90%_70%_at_15%_-10%,rgba(48,213,200,0.14),transparent_50%),radial-gradient(circle_at_85%_15%,rgba(48,213,200,0.08),transparent_36%)]"
+          aria-hidden
+        />
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
             <CatalogLogo src={logoSrc} />
             <div className="text-center sm:text-left">
@@ -198,31 +251,6 @@ export function CatalogClient({ members, logoSrc = "/logo.png" }: Props) {
           </div>
         ) : (
           <>
-            <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-elevated)]/80 p-5 text-sm leading-relaxed text-[var(--muted)] dark:bg-[var(--card)]/80">
-              <p>
-                Aşağıda yayındaki üye kayıtları listelenir. Arama ve sektör alanları sonuçları anında daraltır.{" "}
-                <Link href="/anasayfa" className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">
-                  Anasayfa
-                </Link>
-                ya da{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setListVisible(false);
-                    try {
-                      sessionStorage.removeItem(CATALOG_SESSION_KEY);
-                    } catch {
-                      /* noop */
-                    }
-                  }}
-                  className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
-                >
-                  giriş metnini yeniden göster
-                </button>
-                .
-              </p>
-            </div>
-
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <label className="flex flex-1 flex-col gap-2 text-sm font-medium text-[var(--foreground)]">
                 Katalog araması
@@ -263,24 +291,9 @@ export function CatalogClient({ members, logoSrc = "/logo.png" }: Props) {
       </section>
 
       <footer className="mt-auto border-t border-[var(--card-border)] bg-[var(--footer-bg)] py-6 text-center text-sm text-[var(--muted)] transition-colors">
-        © Türk Tudun. Bu sayfa üye bilgi platformu niteliğindedir. Başvurular web formu veya{" "}
-        <a
-          className="font-medium text-[var(--foreground)] underline decoration-[var(--accent)] underline-offset-4"
-          href={FORM_URL}
-        >
-          resmî Google Form
-        </a>{" "}
-        üzerinden kabul edilir.{" "}
-        <Link className="underline decoration-[var(--accent)] underline-offset-4" href="/kayit">
-          Üyelik başvurusu
-        </Link>
-        {" · "}
-        <Link className="underline decoration-[var(--accent)] underline-offset-4" href="/admin/login">
-          Yönetim paneli
-        </Link>
+        © Türk Tudun. Bu sayfa üye bilgi platformu niteliğindedir. Başvurular web formu üzerinden kabul edilir.
       </footer>
 
-      {listVisible ? <DemandChatbot sectorFilter={sector} /> : null}
     </div>
   );
 }

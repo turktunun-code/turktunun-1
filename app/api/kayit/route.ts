@@ -1,11 +1,9 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { FORM_URL } from "@/lib/constants";
+import { persistMembershipApplication } from "@/lib/membership-supabase";
 import { parseMembershipBody } from "@/lib/membership-submission";
-import { getRedis } from "@/lib/redis";
+import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
-const LIST_KEY = "kayit:basvurular";
-
-/** Başvuruyu Redis kuyruğa yazar. Redis yoksa Google Form adresini döner. */
 export async function POST(req: Request) {
   let body: unknown;
   try {
@@ -19,15 +17,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, issues: parsed.issues }, { status: 400 });
   }
 
-  const r = getRedis();
-  if (!r) {
+  if (!isSupabaseConfigured()) {
     return NextResponse.json(
       {
         ok: false,
         code: "NO_STORAGE",
         message:
-          "Başvurunuz şu anda sistem kayıtlarına alınamamıştır. Aynı içeriği Google Form aracılığıyla iletmeniz rica olunur.",
-        formUrl: FORM_URL,
+          "Başvuru sunucusu yapılandırılmamış. Yöneticinizin NEXT_PUBLIC_SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY ortam değişkenlerini ayarlaması gerekir.",
       },
       { status: 503 },
     );
@@ -39,7 +35,22 @@ export async function POST(req: Request) {
     source: "site-form",
   };
 
-  await r.lpush(LIST_KEY, JSON.stringify(record));
+  const saved = await persistMembershipApplication(record);
 
-  return NextResponse.json({ ok: true, message: "Başvurunuz sisteme başarıyla iletilmiştir." });
+  if (saved) {
+    try {
+      revalidatePath("/katalog");
+      revalidatePath("/oneriler");
+      revalidatePath("/anasayfa");
+      revalidatePath("/admin");
+    } catch (e) {
+      console.error("[kayit] revalidatePath", e);
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    message: "Başvurunuz sisteme başarıyla iletilmiştir.",
+    persisted: saved,
+  });
 }

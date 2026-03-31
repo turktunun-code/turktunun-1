@@ -8,8 +8,11 @@ export type Member = {
   contact: string;
   digitalContact?: string;
   reference?: string;
-  source?: "seed" | "sheet";
+  source?: "supabase" | "sheet" | "site-form";
 };
+
+/** Tablo satırına sabit kimlik; düzenleme ve onay bu anahtarla tutulur (ad/iletişim değişse bile). */
+export type MemberWithLineage = Member & { lineageKey: string };
 
 export function memberDedupeKey(m: Pick<Member, "fullName" | "contact">): string {
   const name = m.fullName.toLowerCase().trim().replace(/\s+/g, " ");

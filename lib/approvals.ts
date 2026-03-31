@@ -1,45 +1,55 @@
-import { memberDedupeKey, type Member } from "./member";
-import { getRedis } from "./redis";
+import type { MemberWithLineage } from "./member";
+import { getSupabaseAdmin } from "./supabase/admin";
 
 export type ApprovalStatus = "approved" | "pending" | "rejected";
 
-const HASH_KEY = "member:approval";
-
 export async function getApprovalMap(): Promise<Record<string, ApprovalStatus>> {
-  const r = getRedis();
-  if (!r) return {};
+  const sb = getSupabaseAdmin();
+  if (!sb) return {};
 
-  const raw = await r.hgetall(HASH_KEY);
-  const out: Record<string, ApprovalStatus> = {};
-
-  for (const [k, v] of Object.entries(raw ?? {})) {
-    if (v === "approved" || v === "pending" || v === "rejected") {
-      out[k] = v;
-    }
+  const { data, error } = await sb.from("members").select("lineage_key, approval_status");
+  if (error) {
+    console.error("[approvals] okunamadı", error.message);
+    return {};
   }
 
+  const out: Record<string, ApprovalStatus> = {};
+  for (const r of data ?? []) {
+    const k = r.lineage_key as string;
+    const s = r.approval_status as string;
+    if (s === "approved" || s === "pending" || s === "rejected") {
+      out[k] = s;
+    }
+  }
   return out;
 }
 
 export async function setMemberApproval(memberKey: string, status: ApprovalStatus): Promise<void> {
-  const r = getRedis();
-  if (!r) throw new Error("Redis yapılandırılmadı");
+  const sb = getSupabaseAdmin();
+  if (!sb) throw new Error("Supabase yapılandırılmadı");
 
-  if (status === "approved") {
-    await r.hdel(HASH_KEY, memberKey);
-  } else {
-    await r.hset(HASH_KEY, { [memberKey]: status });
-  }
+  const { error } = await sb
+    .from("members")
+    .update({ approval_status: status, updated_at: new Date().toISOString() })
+    .eq("lineage_key", memberKey.trim());
+  if (error) throw new Error(error.message);
 }
 
-/** Katalogda yalnızca onaylı kayıtlar: varsayılan onaylı; pending ve rejected gizlenir. */
+export async function deleteMemberApproval(memberKey: string): Promise<void> {
+  await setMemberApproval(memberKey, "approved");
+}
+
+/** Artık kullanılmıyor; uyumluluk için no-op. */
+export async function pruneApprovalEntriesNotInMemberList(_validLineageKeys: Set<string>): Promise<number> {
+  return 0;
+}
+
 export function filterPublicMembers(
-  members: Member[],
+  members: MemberWithLineage[],
   approvalMap: Record<string, ApprovalStatus>,
-): Member[] {
+): MemberWithLineage[] {
   return members.filter((m) => {
-    const key = memberDedupeKey(m);
-    const status = approvalMap[key] ?? "approved";
+    const status = approvalMap[m.lineageKey] ?? "approved";
     return status === "approved";
   });
 }

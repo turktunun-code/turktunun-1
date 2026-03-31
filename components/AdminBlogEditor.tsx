@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { parseAdminApiResponse } from "@/lib/admin-fetch";
 import type { HomeBlogItem } from "@/lib/home-content";
 
 const inputClass =
@@ -9,11 +10,11 @@ const inputClass =
 type Props = {
   initialItems: HomeBlogItem[];
   canSave: boolean;
-  fromRedis: boolean;
+  hasPersistedOverride: boolean;
   onSaved: () => void;
 };
 
-export function AdminBlogEditor({ initialItems, canSave, fromRedis, onSaved }: Props) {
+export function AdminBlogEditor({ initialItems, canSave, hasPersistedOverride, onSaved }: Props) {
   const [items, setItems] = useState<HomeBlogItem[]>(initialItems);
   const [saving, setSaving] = useState(false);
 
@@ -49,17 +50,18 @@ export function AdminBlogEditor({ initialItems, canSave, fromRedis, onSaved }: P
       const res = await fetch("/api/admin/home-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ blog: items }),
       });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        alert(j.error ?? "Kaydedilemedi.");
+      const parsed = await parseAdminApiResponse(res);
+      if (!parsed.ok) {
+        alert(parsed.error ?? "Kaydedilemedi.");
         return;
       }
       onSaved();
       alert("Blog kayıtları kaydedildi.");
-    } catch {
-      alert("İstek başarısız.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ağ hatası. Bağlantınızı kontrol edin.");
     } finally {
       setSaving(false);
     }
@@ -74,17 +76,18 @@ export function AdminBlogEditor({ initialItems, canSave, fromRedis, onSaved }: P
       const res = await fetch("/api/admin/home-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ resetBlog: true }),
       });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        alert(j.error ?? "İşlem başarısız.");
+      const parsed = await parseAdminApiResponse(res);
+      if (!parsed.ok) {
+        alert(parsed.error ?? "İşlem başarısız.");
         return;
       }
       onSaved();
       alert("Blog varsayılan içeriğe alındı.");
-    } catch {
-      alert("İstek başarısız.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ağ hatası.");
     } finally {
       setSaving(false);
     }
@@ -98,7 +101,9 @@ export function AdminBlogEditor({ initialItems, canSave, fromRedis, onSaved }: P
       </p>
       <p className="mt-2 text-xs text-[var(--muted)]">
         Şu anki kaynak:{" "}
-        <strong className="text-[var(--foreground)]">{fromRedis ? "Redis (yönetim)" : "lib/home-content.ts varsayılanı"}</strong>
+        <strong className="text-[var(--foreground)]">
+          {hasPersistedOverride ? "Kayıtlı içerik (Supabase veya dosya)" : "lib/home-content.ts varsayılanı"}
+        </strong>
       </p>
 
       <div className="mt-6 space-y-5">
@@ -180,7 +185,7 @@ export function AdminBlogEditor({ initialItems, canSave, fromRedis, onSaved }: P
         <button
           type="button"
           onClick={() => void resetDefaults()}
-          disabled={!canSave || saving || !fromRedis}
+          disabled={!canSave || saving || !hasPersistedOverride}
           className="rounded-full border border-[var(--card-border)] px-5 py-2.5 text-sm font-medium hover:border-amber-500/50 disabled:opacity-50"
         >
           Varsayılana dön

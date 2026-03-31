@@ -128,7 +128,6 @@ export function MembershipForm() {
   const [loading, setLoading] = useState(false);
   const [issues, setIssues] = useState<string[]>([]);
   const [done, setDone] = useState(false);
-  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
 
   const subOptions = useMemo(
     () => SECTOR_BRANCHES.find((b) => b.id === branchId)?.subsectors ?? [],
@@ -178,7 +177,6 @@ export function MembershipForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIssues([]);
-    setFallbackUrl(null);
 
     const sectorStr = buildSectorField(branchId, subValue, sectorManual);
     if (!sectorStr) {
@@ -247,7 +245,6 @@ export function MembershipForm() {
       const data = (await res.json()) as {
         ok?: boolean;
         issues?: string[];
-        formUrl?: string;
         message?: string;
       };
 
@@ -256,9 +253,8 @@ export function MembershipForm() {
         return;
       }
 
-      if (res.status === 503 && data.formUrl) {
+      if (res.status === 503) {
         setIssues([data.message ?? "Başvuru sunucuya iletilemedi."]);
-        setFallbackUrl(data.formUrl);
         return;
       }
 
@@ -824,15 +820,6 @@ export function MembershipForm() {
               <li key={`${i}-${msg}`}>{msg}</li>
             ))}
           </ul>
-          {fallbackUrl ? (
-            <p className="mt-3">
-              Yedek başvuru kanalı:{" "}
-              <a className="font-semibold underline" href={fallbackUrl} target="_blank" rel="noopener noreferrer">
-                Google Form aracılığıyla iletiniz
-              </a>
-              .
-            </p>
-          ) : null}
         </div>
       ) : null}
 
@@ -854,8 +841,7 @@ export function MembershipForm() {
 
       <p className="text-xs text-[var(--muted)]">
         <span className="text-red-600 dark:text-red-400">*</span> ile işaretli alanların doldurulması zorunludur.
-        Çevrimiçi başvurunun alınabilmesi için altyapıda Redis (Upstash) tanımlı olmalıdır; aksi halde yedek Google
-        Form kullanılmalıdır.
+        Çevrimiçi başvurunun alınabilmesi için Supabase ortam değişkenleri tanımlı olmalıdır.
       </p>
     </form>
   );

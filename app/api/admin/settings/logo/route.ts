@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin-api";
 import { getSiteLogoUrl, setSiteLogoUrl } from "@/lib/site-settings";
-import { isRedisConfigured } from "@/lib/redis";
+import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export async function GET() {
   if (!(await getAdminSession())) {
@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const url = await getSiteLogoUrl();
-  return NextResponse.json({ url, redis: isRedisConfigured() });
+  return NextResponse.json({ url, supabase: isSupabaseConfigured() });
 }
 
 export async function POST(req: Request) {
@@ -18,8 +18,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  if (!isRedisConfigured()) {
-    return NextResponse.json({ error: "Redis gerekli" }, { status: 503 });
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Supabase gerekli" }, { status: 503 });
   }
 
   let body: { url?: string | null };

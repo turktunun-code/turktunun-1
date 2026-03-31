@@ -1,80 +1,87 @@
-import seedRaw from "@/data/seed-members.json";
 import { filterPublicMembers, getApprovalMap } from "./approvals";
-import { fetchSheetAsCsvViaApi } from "./google-sheets-api";
-import {
-  effectiveSheetGid,
-  effectiveSheetId,
-  getStoredGoogleSheetRows,
-  resolveServiceAccountCredentials,
-} from "./google-sheet-settings";
-import { memberDedupeKey, type Member } from "./member";
-import { sheetCsvToMembers } from "./parseSheet";
+import { getExcludedMemberKeys } from "./member-exclusions";
+import { applyMemberOverridesBulk } from "./member-overrides";
+import { type Member, type MemberWithLineage } from "./member";
+import { getSupabaseAdmin } from "./supabase/admin";
 
-const REVALIDATE_SECONDS = Number(process.env.CACHE_REVALIDATE_SECONDS ?? 120);
+type MemberDbRow = {
+  lineage_key: string;
+  rank: string;
+  full_name: string;
+  sector: string;
+  brand: string;
+  materials: string;
+  location: string;
+  contact: string;
+  digital_contact: string;
+  reference: string;
+  source: string;
+};
 
-function getSeedMembers(): Member[] {
-  return (seedRaw as Member[]).map((m) => ({ ...m, source: "seed" as const }));
+function rowToMemberWithLineage(r: MemberDbRow): MemberWithLineage {
+  return {
+    lineageKey: r.lineage_key,
+    rank: r.rank?.trim() ? r.rank : undefined,
+    fullName: r.full_name,
+    sector: r.sector ?? "",
+    brand: r.brand ?? "",
+    materials: r.materials ?? "",
+    location: r.location ?? "",
+    contact: r.contact ?? "",
+    digitalContact: r.digital_contact?.trim() ? r.digital_contact : undefined,
+    reference: r.reference?.trim() ? r.reference : undefined,
+    source: (r.source as Member["source"]) ?? "supabase",
+  };
 }
 
-async function fetchPublicCsvExport(sheetId: string, gid: string): Promise<Member[]> {
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${encodeURIComponent(gid)}`;
-  try {
-    const res = await fetch(url, {
-      next: { revalidate: Number.isFinite(REVALIDATE_SECONDS) ? REVALIDATE_SECONDS : 120 },
-      headers: { Accept: "text/csv" },
-    });
+async function fetchMembersFromDb(): Promise<MemberWithLineage[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return [];
 
-    if (!res.ok) {
-      console.error("[members] sheet fetch failed", res.status, res.statusText);
-      return [];
-    }
+  const { data, error } = await sb
+    .from("members")
+    .select("lineage_key,rank,full_name,sector,brand,materials,location,contact,digital_contact,reference,source")
+    .order("full_name", { ascending: true });
 
-    const text = await res.text();
-    return sheetCsvToMembers(text);
-  } catch (e) {
-    console.error("[members] sheet fetch error", e);
+  if (error) {
+    console.error("[members] Supabase", error.message);
     return [];
   }
+
+  return (data ?? []).map((r) => rowToMemberWithLineage(r as MemberDbRow));
 }
 
-async function fetchSheetMembers(): Promise<Member[]> {
-  const stored = await getStoredGoogleSheetRows();
-  const sheetId = effectiveSheetId(stored.sheetId);
-  const gid = effectiveSheetGid(stored.gid);
-  if (!sheetId) return [];
-
-  const creds = await resolveServiceAccountCredentials();
-  if (creds) {
-    try {
-      const csv = await fetchSheetAsCsvViaApi(sheetId, gid, creds);
-      if (csv) return sheetCsvToMembers(csv);
-    } catch (e) {
-      console.error("[members] Sheets API error", e);
-    }
-    console.error("[members] Sheets API başarısız; herkese açık CSV deneniyor");
+function normalizeMergedMemberList(list: MemberWithLineage[]): MemberWithLineage[] {
+  const seen = new Set<string>();
+  const out: MemberWithLineage[] = [];
+  for (const m of list) {
+    if (m.fullName.trim().length < 2) continue;
+    if (seen.has(m.lineageKey)) continue;
+    seen.add(m.lineageKey);
+    out.push(m);
   }
-
-  return fetchPublicCsvExport(sheetId, gid);
+  return out;
 }
 
-function mergeSheetAndSeed(sheet: Member[], seed: Member[]): Member[] {
-  if (sheet.length === 0) return seed;
-
-  const seen = new Set(sheet.map(memberDedupeKey));
-  const extras = seed.filter((s) => !seen.has(memberDedupeKey(s)));
-
-  return [...sheet, ...extras];
+async function computeMergedMemberList(): Promise<MemberWithLineage[]> {
+  const sheet = await fetchMembersFromDb();
+  const withOverrides = await applyMemberOverridesBulk(sheet);
+  return normalizeMergedMemberList(withOverrides);
 }
 
-export async function getMergedMembers(): Promise<Member[]> {
-  const seed = getSeedMembers();
-  const sheet = await fetchSheetMembers();
-  return mergeSheetAndSeed(sheet, seed);
+export async function getMergedMembersUnfiltered(): Promise<MemberWithLineage[]> {
+  return computeMergedMemberList();
 }
 
-/** Genel katalog: onay durumuna göre filtrelenir (pending/rejected gizlenir). */
+export async function getMergedMembers(): Promise<MemberWithLineage[]> {
+  const list = await computeMergedMemberList();
+  const excluded = await getExcludedMemberKeys();
+  if (excluded.size === 0) return list;
+  return list.filter((m) => !excluded.has(m.lineageKey));
+}
+
 export async function getMembers(): Promise<Member[]> {
   const merged = await getMergedMembers();
   const map = await getApprovalMap();
-  return filterPublicMembers(merged, map);
+  return filterPublicMembers(merged, map).map(({ lineageKey: _, ...m }) => m);
 }

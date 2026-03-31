@@ -1,37 +1,45 @@
-import { getRedis } from "./redis";
+import { DEFAULT_CATALOG_LOGO } from "./constants";
+import { getSupabaseAdmin } from "./supabase/admin";
 
-const LOGO_URL_KEY = "settings:logoUrl";
+const LOGO_KEY = "logo_url";
 
-/**
- * Redis’te kayıtlı admin logosu (panelden). Canlı sayfada kullanımı varsayılan olarak kapalıdır;
- * aksi halde dış URL sıkça parşömen arka planlı görüntüyü bastırır. Açmak için:
- * USE_STORED_SITE_LOGO=true
- */
-export async function getSiteLogoUrl(): Promise<string | null> {
-  const r = getRedis();
-  if (!r) return null;
-  const v = await r.get<string>(LOGO_URL_KEY);
-  const u = v?.trim();
-  return u && u.length > 0 ? u : null;
+function coerceString(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") return v.trim() || null;
+  if (typeof v === "number" || typeof v === "boolean") return String(v).trim() || null;
+  return null;
 }
 
-/** Ana sayfa logosu: varsayılan her zaman public/logo.png */
-export async function getCatalogLogoSrc(): Promise<string> {
-  const allowStored = process.env.USE_STORED_SITE_LOGO === "true";
-  if (!allowStored) {
-    return "/logo.png";
+export async function getSiteLogoUrl(): Promise<string | null> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return null;
+
+  const { data, error } = await sb.from("site_settings").select("value").eq("key", LOGO_KEY).maybeSingle();
+  if (error) {
+    console.error("[site-settings] logo", error.message);
+    return null;
   }
+  return coerceString(data?.value);
+}
+
+export async function getCatalogLogoSrc(): Promise<string> {
   const custom = await getSiteLogoUrl();
-  return custom ?? "/logo.png";
+  return custom ?? DEFAULT_CATALOG_LOGO;
 }
 
 export async function setSiteLogoUrl(url: string | null): Promise<void> {
-  const r = getRedis();
-  if (!r) throw new Error("Redis yapılandırılmadı");
+  const sb = getSupabaseAdmin();
+  if (!sb) throw new Error("Supabase yapılandırılmadı");
 
   if (!url?.trim()) {
-    await r.del(LOGO_URL_KEY);
-  } else {
-    await r.set(LOGO_URL_KEY, url.trim().slice(0, 2048));
+    await sb.from("site_settings").delete().eq("key", LOGO_KEY);
+    return;
   }
+
+  const u = url.trim().slice(0, 2048);
+  const { error } = await sb.from("site_settings").upsert(
+    { key: LOGO_KEY, value: u, updated_at: new Date().toISOString() },
+    { onConflict: "key" },
+  );
+  if (error) throw new Error(error.message);
 }

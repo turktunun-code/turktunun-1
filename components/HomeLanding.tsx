@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { HomeBlogItem, HomeNewsItem } from "@/lib/home-content";
+import { DemandChatbot } from "@/components/DemandChatbot";
 import { TAGLINE } from "@/lib/constants";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -25,6 +27,8 @@ type Props = {
 };
 
 export function HomeLanding({ initialNews, initialBlog }: Props) {
+  const [heroBroken, setHeroBroken] = useState(false);
+
   return (
     <div className="min-h-dvh flex flex-col bg-[var(--background)] text-[var(--foreground)] transition-colors">
       <header className="sticky top-0 z-20 border-b border-[var(--card-border)] bg-[var(--header-bg)]/95 backdrop-blur-md">
@@ -54,13 +58,21 @@ export function HomeLanding({ initialNews, initialBlog }: Props) {
 
       <section className="relative flex min-h-[min(58vh,560px)] flex-col overflow-hidden border-b border-[var(--card-border)] sm:min-h-[min(62vh,620px)]">
         <div className="absolute inset-0">
-          <img
-            src={HERO_SRC}
-            alt=""
-            decoding="async"
-            fetchPriority="high"
-            className="h-full w-full object-cover object-[50%_32%] sm:object-[50%_36%] md:object-[50%_38%]"
-          />
+          {heroBroken ? (
+            <div
+              className="h-full w-full bg-gradient-to-br from-zinc-900 via-[#1a1a1c] to-black"
+              aria-hidden
+            />
+          ) : (
+            <img
+              src={HERO_SRC}
+              alt="Türk Tudun: tarihî ticaret hanı ve kurumsal mühür illüstrasyonu"
+              decoding="async"
+              fetchPriority="high"
+              onError={() => setHeroBroken(true)}
+              className="h-full w-full object-cover object-[50%_32%] sm:object-[50%_36%] md:object-[50%_38%]"
+            />
+          )}
           <div
             className="absolute inset-0 bg-gradient-to-t from-[var(--background)] from-25% via-[var(--background)]/80 to-transparent"
             aria-hidden
@@ -70,13 +82,13 @@ export function HomeLanding({ initialNews, initialBlog }: Props) {
           <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-[var(--accent)] drop-shadow-[0_1px_12px_rgba(0,0,0,0.85)]">
             Ticaret &amp; hizmet
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight drop-shadow-[0_2px_24px_rgba(0,0,0,0.9)] sm:text-4xl md:text-5xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-[var(--foreground)] drop-shadow-[0_1px_2px_rgba(255,255,255,0.6)] dark:drop-shadow-[0_2px_24px_rgba(0,0,0,0.9)] sm:text-4xl md:text-5xl">
             Türk Tudun
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/95 sm:text-lg [text-shadow:0_2px_20px_rgba(0,0,0,0.85)]">
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-800 sm:text-lg dark:text-white/95 dark:[text-shadow:0_2px_20px_rgba(0,0,0,0.85)]">
             {TAGLINE}
           </p>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/90 [text-shadow:0_1px_16px_rgba(0,0,0,0.8)]">
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-700 dark:text-white/90 dark:[text-shadow:0_1px_16px_rgba(0,0,0,0.8)]">
             Platform; duyuru ve blog içerikleriyle güncel kalır, ardından üye bilgi kataloğuna geçiş yapılır. Katalogda
             yalnızca yayıma onaylı kayıtlar listelenir.
           </p>
@@ -148,6 +160,8 @@ export function HomeLanding({ initialNews, initialBlog }: Props) {
           </Link>
         </section>
       </main>
+
+      <DemandChatbot />
 
       <footer className="border-t border-[var(--card-border)] bg-[var(--footer-bg)] py-8 text-center text-xs text-[var(--muted)]">
         <p>© Türk Tudun · Ticaret ve hizmet platformu</p>

@@ -502,7 +502,7 @@ Yanıt başarılıysa önbellek temizlenmiş demektir. `REVALIDATE_SECRET` tanı
 | `ADMIN_SESSION_SECRET` | Panel kullanacaksanız | ≥16 karakter, oturum imzası |
 | `REVALIDATE_SECRET` | Hayır | Elle önbellek temizleme |
 | `CACHE_REVALIDATE_SECONDS` | Hayır | Sayfa yenileme aralığı (saniye) |
-| `USE_STORED_SITE_LOGO` | Hayır | `true` ise paneldeki logo URL’si kullanılır |
+| *(Logo)* | — | Katalog logosu **Sistem → Kurumsal logo** ile Redis’e kaydedilir; ayrı ortam değişkeni yok |
 | `HOME_CONTENT_FILE` | Sadece yerel deneme | `true` → haber/blog `data/home-content.json`; **Vercel’de kalıcı değil** |
 
 Tam yorum satırlı şablon: **`/.env.example`**

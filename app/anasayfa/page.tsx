@@ -8,7 +8,8 @@ export const metadata: Metadata = {
   description: `Haberler, blog ve üye katalogu. ${TAGLINE}`,
 };
 
-export const revalidate = 60;
+/** Anasayfa içeriği Supabase / dosya önbelleğinden istek anında okunur (Dynamic server usage). */
+export const dynamic = "force-dynamic";
 
 export default async function AnasayfaPage() {
   const [initialNews, initialBlog] = await Promise.all([getResolvedHomeNews(), getResolvedHomeBlog()]);

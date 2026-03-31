@@ -1,10 +1,10 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { HOME_BLOG, HOME_NEWS, type HomeBlogItem, type HomeNewsItem } from "./home-content";
-import { getRedis } from "./redis";
+import { getSupabaseAdmin } from "./supabase/admin";
 
-const KEY_NEWS = "content:homeNews";
-const KEY_BLOG = "content:homeBlog";
+const ID_NEWS = "home_news";
+const ID_BLOG = "home_blog";
 const MAX_JSON = 120_000;
 
 const HOME_CONTENT_FILE_PATH = path.join(process.cwd(), "data", "home-content.json");
@@ -14,7 +14,28 @@ export function isHomeContentFileStoreEnabled(): boolean {
 }
 
 export function canPersistHomeContent(): boolean {
-  return getRedis() !== null || isHomeContentFileStoreEnabled();
+  return getSupabaseAdmin() !== null || isHomeContentFileStoreEnabled();
+}
+
+function normalizeStoredHomeJson(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    return t.length > 0 ? t : null;
+  }
+  if (typeof raw === "number" || typeof raw === "boolean") {
+    const s = String(raw).trim();
+    return s.length > 0 ? s : null;
+  }
+  if (typeof raw === "object") {
+    try {
+      const s = JSON.stringify(raw);
+      return s.length > 0 ? s : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 function isValidId(id: string): boolean {
@@ -150,32 +171,53 @@ async function clearFileSection(kind: "news" | "blog"): Promise<void> {
   await atomicWriteHomeContentFile(`${JSON.stringify(next, null, 2)}\n`);
 }
 
+async function readHomeNewsFromSupabase(): Promise<HomeNewsItem[] | null> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return null;
+  const { data, error } = await sb.from("home_content").select("data").eq("id", ID_NEWS).maybeSingle();
+  if (error || !data?.data) return null;
+  const raw = normalizeStoredHomeJson(data.data);
+  if (!raw) return validateNewsItems(data.data as unknown) ?? null;
+  return parseStoredNews(raw);
+}
+
+async function readHomeBlogFromSupabase(): Promise<HomeBlogItem[] | null> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return null;
+  const { data, error } = await sb.from("home_content").select("data").eq("id", ID_BLOG).maybeSingle();
+  if (error || !data?.data) return null;
+  if (Array.isArray(data.data)) return validateBlogItems(data.data);
+  const raw = normalizeStoredHomeJson(data.data);
+  if (!raw) return null;
+  return parseStoredBlog(raw);
+}
+
 export async function getResolvedHomeNews(): Promise<HomeNewsItem[]> {
-  const r = getRedis();
-  if (r) {
-    const raw = await r.get<string>(KEY_NEWS);
-    if (!raw?.trim()) return HOME_NEWS;
-    const p = parseStoredNews(raw);
-    return p ?? HOME_NEWS;
-  }
+  const sbNews = await readHomeNewsFromSupabase();
+  if (sbNews) return sbNews;
+
   if (isHomeContentFileStoreEnabled()) {
-    const f = await parseFileStore();
-    if (f.news) return f.news;
+    try {
+      const f = await parseFileStore();
+      if (f.news) return f.news;
+    } catch (e) {
+      console.error("[home-content] Dosya deposu haber okunamadı", e);
+    }
   }
   return HOME_NEWS;
 }
 
 export async function getResolvedHomeBlog(): Promise<HomeBlogItem[]> {
-  const r = getRedis();
-  if (r) {
-    const raw = await r.get<string>(KEY_BLOG);
-    if (!raw?.trim()) return HOME_BLOG;
-    const p = parseStoredBlog(raw);
-    return p ?? HOME_BLOG;
-  }
+  const sbBlog = await readHomeBlogFromSupabase();
+  if (sbBlog) return sbBlog;
+
   if (isHomeContentFileStoreEnabled()) {
-    const f = await parseFileStore();
-    if (f.blog) return f.blog;
+    try {
+      const f = await parseFileStore();
+      if (f.blog) return f.blog;
+    } catch (e) {
+      console.error("[home-content] Dosya deposu blog okunamadı", e);
+    }
   }
   return HOME_BLOG;
 }
@@ -186,18 +228,26 @@ export async function getHomeContentAdminPayload(): Promise<{
   newsOverridden: boolean;
   blogOverridden: boolean;
 }> {
-  const r = getRedis();
+  const sb = getSupabaseAdmin();
   let newsOverridden = false;
   let blogOverridden = false;
-  if (r) {
-    const [ns, bs] = await Promise.all([r.get<string>(KEY_NEWS), r.get<string>(KEY_BLOG)]);
-    newsOverridden = !!(ns?.trim() && parseStoredNews(ns));
-    blogOverridden = !!(bs?.trim() && parseStoredBlog(bs));
+  if (sb) {
+    try {
+      const [nR, bR] = await Promise.all([
+        sb.from("home_content").select("id").eq("id", ID_NEWS).maybeSingle(),
+        sb.from("home_content").select("id").eq("id", ID_BLOG).maybeSingle(),
+      ]);
+      newsOverridden = !!nR.data;
+      blogOverridden = !!bR.data;
+    } catch (e) {
+      console.error("[home-content] Supabase admin payload", e);
+    }
   } else if (isHomeContentFileStoreEnabled()) {
     const f = await parseFileStore();
     newsOverridden = f.news !== null;
     blogOverridden = f.blog !== null;
   }
+
   const [news, blog] = await Promise.all([getResolvedHomeNews(), getResolvedHomeBlog()]);
   return { news, blog, newsOverridden, blogOverridden };
 }
@@ -205,55 +255,65 @@ export async function getHomeContentAdminPayload(): Promise<{
 export async function persistHomeNews(items: HomeNewsItem[]): Promise<void> {
   const payload = JSON.stringify(items);
   if (payload.length > MAX_JSON) throw new Error("İçerik çok büyük");
-  const redis = getRedis();
-  if (redis) {
-    await redis.set(KEY_NEWS, payload);
+
+  const sb = getSupabaseAdmin();
+  if (sb) {
+    const { error } = await sb.from("home_content").upsert(
+      { id: ID_NEWS, data: items, updated_at: new Date().toISOString() },
+      { onConflict: "id" },
+    );
+    if (error) throw new Error(error.message);
     return;
   }
   if (isHomeContentFileStoreEnabled()) {
     await writeFileStoreMerge({ news: items });
     return;
   }
-  throw new Error("İçerik kaydı için Redis veya HOME_CONTENT_FILE=true gerekli");
+  throw new Error("İçerik kaydı için Supabase veya HOME_CONTENT_FILE=true gerekli");
 }
 
 export async function persistHomeBlog(items: HomeBlogItem[]): Promise<void> {
   const payload = JSON.stringify(items);
   if (payload.length > MAX_JSON) throw new Error("İçerik çok büyük");
-  const redis = getRedis();
-  if (redis) {
-    await redis.set(KEY_BLOG, payload);
+
+  const sb = getSupabaseAdmin();
+  if (sb) {
+    const { error } = await sb.from("home_content").upsert(
+      { id: ID_BLOG, data: items, updated_at: new Date().toISOString() },
+      { onConflict: "id" },
+    );
+    if (error) throw new Error(error.message);
     return;
   }
   if (isHomeContentFileStoreEnabled()) {
     await writeFileStoreMerge({ blog: items });
     return;
   }
-  throw new Error("İçerik kaydı için Redis veya HOME_CONTENT_FILE=true gerekli");
+  throw new Error("İçerik kaydı için Supabase veya HOME_CONTENT_FILE=true gerekli");
 }
 
 export async function clearPersistedHomeNews(): Promise<void> {
-  const redis = getRedis();
-  if (redis) {
-    await redis.del(KEY_NEWS);
+  const sb = getSupabaseAdmin();
+  if (sb) {
+    await sb.from("home_content").delete().eq("id", ID_NEWS);
     return;
   }
   if (isHomeContentFileStoreEnabled()) {
     await clearFileSection("news");
     return;
   }
-  throw new Error("İçerik kaydı için Redis veya HOME_CONTENT_FILE=true gerekli");
+  throw new Error("İçerik kaydı için Supabase veya HOME_CONTENT_FILE=true gerekli");
 }
 
 export async function clearPersistedHomeBlog(): Promise<void> {
-  const redis = getRedis();
-  if (redis) {
-    await redis.del(KEY_BLOG);
+  const sb = getSupabaseAdmin();
+  if (sb) {
+    await sb.from("home_content").delete().eq("id", ID_BLOG);
     return;
   }
   if (isHomeContentFileStoreEnabled()) {
     await clearFileSection("blog");
     return;
   }
-  throw new Error("İçerik kaydı için Redis veya HOME_CONTENT_FILE=true gerekli");
+  throw new Error("İçerik kaydı için Supabase veya HOME_CONTENT_FILE=true gerekli");
 }

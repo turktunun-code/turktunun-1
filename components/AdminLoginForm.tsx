@@ -51,10 +51,9 @@ export function AdminLoginForm({ misconfigured }: { misconfigured: boolean }) {
             className="mt-6 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-[var(--foreground)]"
             role="alert"
           >
-            Üretim ortamı yapılandırması eksiktir: <code className="font-mono text-xs">ADMIN_PASSWORD</code>, en
-            az on altı karakterlik <code className="font-mono text-xs">ADMIN_SESSION_SECRET</code> ve analitik
-            amaçlı <code className="font-mono text-xs">Upstash Redis</code> erişim bilgileri barındırıcı
-            ortamında tanımlanmalıdır.
+            Oturum sırrı eksik veya çok kısa: barındırıcı ortamında en az on altı karakterlik{" "}
+            <code className="font-mono text-xs">ADMIN_SESSION_SECRET</code> tanımlanmalıdır.{" "}
+            <code className="font-mono text-xs">ADMIN_PASSWORD</code> da ayarlanmalıdır.
           </div>
         ) : null}
 

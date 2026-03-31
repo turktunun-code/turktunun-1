@@ -7,7 +7,10 @@ import type { AdminStats } from "@/lib/analytics";
 import type { ApprovalStatus } from "@/lib/approvals";
 import { AdminBlogEditor } from "@/components/AdminBlogEditor";
 import { AdminNewsEditor } from "@/components/AdminNewsEditor";
+import { DemandChatbot } from "@/components/DemandChatbot";
+import { MemberEditModal, type MemberEditFields } from "@/components/MemberEditModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { DEFAULT_CATALOG_LOGO } from "@/lib/constants";
 import type { HomeBlogItem, HomeNewsItem } from "@/lib/home-content";
 
 type MemberRow = {
@@ -15,21 +18,13 @@ type MemberRow = {
   fullName: string;
   sector: string;
   brand: string;
+  materials: string;
+  location: string;
   contact: string;
+  digitalContact: string;
+  reference: string;
+  rank: string;
   approval: ApprovalStatus;
-};
-
-type GoogleSheetView = {
-  redis: boolean;
-  sheetIdStored: string | null;
-  gidStored: string | null;
-  sheetIdEffective: string | null;
-  gidEffective: string;
-  hasServiceAccountInRedis: boolean;
-  serviceAccountEmail: string | null;
-  hasServiceAccountInEnv: boolean;
-  serviceAccountEnvEmail: string | null;
-  fetchMode: "api" | "public_csv" | "none";
 };
 
 type AdminNavTab = "haber" | "blog" | "uyeler" | "sistem";
@@ -45,33 +40,34 @@ export function AdminDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
-  const [redis, setRedis] = useState(false);
+  const [storageOk, setStorageOk] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
   const [logoSaved, setLogoSaved] = useState<string | null>(null);
   const [memberFilter, setMemberFilter] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [editMemberKey, setEditMemberKey] = useState<string | null>(null);
+  const [editMemberInitial, setEditMemberInitial] = useState<MemberEditFields | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [googleView, setGoogleView] = useState<GoogleSheetView | null>(null);
-  const [googleSheetId, setGoogleSheetId] = useState("");
-  const [googleGid, setGoogleGid] = useState("0");
-  const [googleSaPaste, setGoogleSaPaste] = useState("");
-  const [googleSaving, setGoogleSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminNavTab>("uyeler");
   const [homeNews, setHomeNews] = useState<HomeNewsItem[]>([]);
   const [homeBlog, setHomeBlog] = useState<HomeBlogItem[]>([]);
   const [homeNewsOverridden, setHomeNewsOverridden] = useState(false);
   const [homeBlogOverridden, setHomeBlogOverridden] = useState(false);
   const [homeContentCanSave, setHomeContentCanSave] = useState(false);
+  const [membersFetchError, setMembersFetchError] = useState("");
+  const [siteApplications, setSiteApplications] = useState<unknown[]>([]);
+  const [siteApplicationsOk, setSiteApplicationsOk] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError("");
+    setMembersFetchError("");
     try {
-      const [st, memRes, logoRes, gsRes, hcRes] = await Promise.all([
+      const [st, memRes, logoRes, hcRes, regRes] = await Promise.all([
         fetch("/api/admin/stats"),
         fetch("/api/admin/members"),
         fetch("/api/admin/settings/logo"),
-        fetch("/api/admin/settings/google-sheet"),
         fetch("/api/admin/home-content"),
+        fetch("/api/admin/registrations"),
       ]);
 
       if (st.status === 401) {
@@ -80,42 +76,84 @@ export function AdminDashboard() {
       }
 
       if (hcRes.ok) {
-        const hc = (await hcRes.json()) as {
-          news: HomeNewsItem[];
-          blog: HomeBlogItem[];
-          newsOverridden?: boolean;
-          blogOverridden?: boolean;
-          canSave?: boolean;
-        };
-        setHomeNews(hc.news ?? []);
-        setHomeBlog(hc.blog ?? []);
-        setHomeNewsOverridden(!!hc.newsOverridden);
-        setHomeBlogOverridden(!!hc.blogOverridden);
-        setHomeContentCanSave(!!hc.canSave);
+        try {
+          const hc = (await hcRes.json()) as {
+            news: HomeNewsItem[];
+            blog: HomeBlogItem[];
+            newsOverridden?: boolean;
+            blogOverridden?: boolean;
+            canSave?: boolean;
+          };
+          setHomeNews(hc.news ?? []);
+          setHomeBlog(hc.blog ?? []);
+          setHomeNewsOverridden(!!hc.newsOverridden);
+          setHomeBlogOverridden(!!hc.blogOverridden);
+          setHomeContentCanSave(!!hc.canSave);
+        } catch {
+          setLoadError("Haber ve blog verisi okunamadı. Sayfayı yenileyin.");
+        }
       }
 
       if (st.ok) {
-        setStats(await st.json());
+        try {
+          setStats(await st.json());
+        } catch {
+          setLoadError((prev) => prev || "İstatistikler okunamadı.");
+        }
       }
 
       if (memRes.ok) {
-        const m = (await memRes.json()) as { members: MemberRow[]; redis: boolean };
-        setMembers(m.members);
-        setRedis(m.redis);
+        try {
+          const m = (await memRes.json()) as { members: MemberRow[]; supabase?: boolean };
+          setMembers(
+            (m.members ?? []).map((row) => ({
+              ...row,
+              materials: row.materials ?? "",
+              location: row.location ?? "",
+              digitalContact: row.digitalContact ?? "",
+              reference: row.reference ?? "",
+              rank: row.rank ?? "",
+            })),
+          );
+          setStorageOk(!!m.supabase);
+        } catch {
+          setMembersFetchError("Üye listesi yanıtı çözümlenemedi. Sayfayı yenileyin.");
+        }
+      } else {
+        let detail = "";
+        try {
+          const errBody = (await memRes.json()) as { error?: string };
+          if (errBody.error?.trim()) detail = ` ${errBody.error.trim()}`;
+        } catch {
+          /* yanıt gövdesi yok */
+        }
+        setMembersFetchError(
+          memRes.status === 500
+            ? `Üye listesi sunucuda oluşturulamadı.${detail || " Supabase bağlantısını kontrol edin."}`
+            : `Üye listesi alınamadı (HTTP ${memRes.status}).${detail}`,
+        );
       }
 
       if (logoRes.ok) {
-        const l = (await logoRes.json()) as { url: string | null };
-        setLogoUrl(l.url ?? "");
-        setLogoSaved(l.url);
+        try {
+          const l = (await logoRes.json()) as { url: string | null };
+          setLogoUrl(l.url ?? "");
+          setLogoSaved(l.url);
+        } catch {
+          /* logo yanıtı atlandı */
+        }
       }
 
-      if (gsRes.ok) {
-        const g = (await gsRes.json()) as GoogleSheetView;
-        setGoogleView(g);
-        setGoogleSheetId(g.sheetIdStored ?? g.sheetIdEffective ?? "");
-        setGoogleGid(g.gidStored ?? g.gidEffective ?? "0");
-        setGoogleSaPaste("");
+      if (regRes.ok) {
+        try {
+          const reg = (await regRes.json()) as { items?: unknown[]; supabase?: boolean };
+          setSiteApplications(reg.items ?? []);
+          setSiteApplicationsOk(!!reg.supabase);
+        } catch {
+          setSiteApplications([]);
+        }
+      } else {
+        setSiteApplications([]);
       }
     } catch {
       setLoadError("Panel verileri yüklenemedi. Bağlantınızı kontrol ediniz.");
@@ -132,69 +170,26 @@ export function AdminDashboard() {
     router.refresh();
   }
 
-  async function saveGoogleSheetSettings() {
-    setGoogleSaving(true);
-    try {
-      const body: {
-        sheetId: string;
-        gid: string;
-        serviceAccountJson?: string;
-      } = {
-        sheetId: googleSheetId.trim(),
-        gid: googleGid.trim() || "0",
-      };
-      if (googleSaPaste.trim()) {
-        body.serviceAccountJson = googleSaPaste.trim();
-      }
-      const res = await fetch("/api/admin/settings/google-sheet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const j = (await res.json()) as GoogleSheetView & { ok?: boolean; error?: string };
-      if (!res.ok) {
-        alert(j.error ?? "Google ayarları kaydedilemedi.");
-        return;
-      }
-      setGoogleView(j);
-      setGoogleSheetId(j.sheetIdStored ?? j.sheetIdEffective ?? "");
-      setGoogleGid(j.gidStored ?? j.gidEffective ?? "0");
-      setGoogleSaPaste("");
-      alert("Google Sheets ayarları güncellendi. Katalog önbelleği yenilendi.");
-    } catch {
-      alert("İstek başarısız.");
-    } finally {
-      setGoogleSaving(false);
-    }
-  }
-
-  async function clearGoogleServiceAccount() {
-    if (!confirm("Redis’teki servis hesabı anahtarı silinsin mi? (Ortam değişkeninde tanımlı anahtar varsa okumaya devam edilir.)")) {
+  async function resetMemberOverlay() {
+    if (
+      !confirm(
+        "Tüm üyeler «onaylı» ve «listedeki gizlilik» sıfırlanacak (Supabase’teki veri satırları silinmez). Devam?",
+      )
+    ) {
       return;
     }
-    setGoogleSaving(true);
+    if (!confirm("Son kez onaylıyor musunuz?")) return;
     try {
-      const res = await fetch("/api/admin/settings/google-sheet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sheetId: googleSheetId.trim(),
-          gid: googleGid.trim() || "0",
-          clearServiceAccount: true,
-        }),
-      });
-      const j = (await res.json()) as GoogleSheetView & { error?: string };
+      const res = await fetch("/api/admin/member-overlay-reset", { method: "POST" });
+      const j = (await res.json()) as { error?: string };
       if (!res.ok) {
-        alert(j.error ?? "İşlem başarısız.");
+        alert(j.error ?? "Sıfırlama başarısız.");
         return;
       }
-      setGoogleView(j);
-      setGoogleSaPaste("");
-      alert("Servis hesabı (Redis) kaldırıldı.");
+      alert("Üye onay ve gizleme durumu sıfırlandı. Sayfa yenileniyor.");
+      await load();
     } catch {
       alert("İstek başarısız.");
-    } finally {
-      setGoogleSaving(false);
     }
   }
 
@@ -212,7 +207,7 @@ export function AdminDashboard() {
     const j = (await res.json()) as { url: string | null };
     setLogoSaved(j.url);
     setLogoUrl(j.url ?? "");
-    alert("Kurumsal logo adresi güncellendi. Ana sayfada değişiklik, önbellek süresi sonunda yansıyacaktır.");
+    alert("Kurumsal logo adresi kaydedildi. Katalog sayfası bu HTTPS adresinden görseli yükler.");
   }
 
   async function setApproval(key: string, status: ApprovalStatus) {
@@ -242,6 +237,42 @@ export function AdminDashboard() {
     }
   }
 
+  async function removeMemberFromSite(key: string, displayLabel: string) {
+    const label = displayLabel.trim() || "Bu kayıt";
+    if (
+      !confirm(
+        `«${label}» bu sitede ve katalogda listelenmeyecek.\n\nVeritabanı satırı silinmez; yalnızca gizlenir. Onaylıyor musunuz?`,
+      )
+    ) {
+      return;
+    }
+    setBusyKey(key);
+    try {
+      const res = await fetch("/api/admin/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exclude", key }),
+      });
+      let message: string | undefined;
+      try {
+        const j = (await res.json()) as { error?: string };
+        message = j.error;
+      } catch {
+        message = res.statusText || undefined;
+      }
+      if (!res.ok) {
+        alert(message ?? "İşlem tamamlanamadı.");
+        return;
+      }
+      setMembers((prev) => prev.filter((m) => m.key !== key));
+      setEditMemberKey((k) => (k === key ? null : k));
+    } catch {
+      alert("Sunucuya bağlanılamadı. Ağınızı veya oturumunuzu kontrol ediniz.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   const maxPv = Math.max(1, ...(stats?.dailyPv.map((d) => d.count) ?? [1]));
 
   const filteredMembers = members.filter((m) => {
@@ -251,17 +282,31 @@ export function AdminDashboard() {
       m.fullName.toLowerCase().includes(q) ||
       m.sector.toLowerCase().includes(q) ||
       m.brand.toLowerCase().includes(q) ||
-      m.contact.toLowerCase().includes(q)
+      m.contact.toLowerCase().includes(q) ||
+      m.materials.toLowerCase().includes(q) ||
+      m.location.toLowerCase().includes(q) ||
+      m.digitalContact.toLowerCase().includes(q) ||
+      m.rank.toLowerCase().includes(q)
     );
   });
 
   return (
     <div className="min-h-full bg-[var(--background)] text-[var(--foreground)]">
+      <DemandChatbot />
       <header className="sticky top-0 z-10 border-b border-[var(--card-border)] bg-[var(--header-bg)]/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Yönetim konsolu</p>
-            <h1 className="text-xl font-bold">Kontrol paneli</h1>
+          <div className="flex min-w-0 items-center gap-3">
+            <img
+              src={DEFAULT_CATALOG_LOGO}
+              alt=""
+              width={44}
+              height={44}
+              className="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-[var(--accent)]/40"
+            />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Yönetim konsolu</p>
+              <h1 className="text-xl font-bold tracking-tight">Türk Tudun · Kontrol paneli</h1>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />
@@ -312,32 +357,31 @@ export function AdminDashboard() {
           <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">{loadError}</p>
         ) : null}
 
-        {activeTab === "sistem" && !stats?.redisConfigured ? (
+        {activeTab === "sistem" && !stats?.supabaseConfigured ? (
           <div
             className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-5 py-4 text-sm text-[var(--foreground)]"
             role="status"
           >
-            <strong className="font-semibold">Redis (Upstash) bağlantısı bulunmamaktadır.</strong> Günlük
-            görüntülenme, arama ve sektör analitikleri, logo adresi ile üye onay durumları kalıcı olarak
-            saklanamaz.{" "}
+            <strong className="font-semibold">Supabase bağlantısı bulunmamaktadır.</strong> Üye verisi, analitik,
+            logo ve içerik kaydı için{" "}
             <code className="rounded bg-black/10 px-1 font-mono text-xs dark:bg-white/10">
-              UPSTASH_REDIS_REST_URL
+              NEXT_PUBLIC_SUPABASE_URL
             </code>{" "}
-            ve{" "}
+            ve sunucu ortamında{" "}
             <code className="rounded bg-black/10 px-1 font-mono text-xs dark:bg-white/10">
-              UPSTASH_REDIS_REST_TOKEN
+              SUPABASE_SERVICE_ROLE_KEY
             </code>{" "}
-            değişkenlerinin tanımlanması gerekmektedir.
+            tanımlanmalıdır.
           </div>
         ) : null}
 
-        {activeTab === "uyeler" && !stats?.redisConfigured ? (
+        {activeTab === "uyeler" && !stats?.supabaseConfigured ? (
           <div
             className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-5 py-4 text-sm text-[var(--foreground)]"
             role="status"
           >
-            <strong className="font-semibold">Redis yapılandırılmadı.</strong> Üye yayımlama durumunu
-            kaydetmek için Upstash Redis tanımlanmalıdır.
+            <strong className="font-semibold">Supabase yapılandırılmadı.</strong> Üye listesi ve yayımlama
+            durumunu kaydetmek için ortam değişkenlerini kontrol edin.
           </div>
         ) : null}
 
@@ -346,9 +390,8 @@ export function AdminDashboard() {
             className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-5 py-4 text-sm text-[var(--foreground)]"
             role="status"
           >
-            <strong className="font-semibold">İçerik kaydı gerekli.</strong> Haberleri kaydetmek için{" "}
-            <code className="rounded bg-black/10 px-1 font-mono text-xs dark:bg-white/10">UPSTASH_REDIS_*</code>{" "}
-            tanımlayın veya yerel geliştirmede{" "}
+            <strong className="font-semibold">İçerik kaydı gerekli.</strong> Haberleri kaydetmek için Supabase
+            bağlantısı tanımlayın veya yerel geliştirmede{" "}
             <code className="rounded bg-black/10 px-1 font-mono text-xs dark:bg-white/10">HOME_CONTENT_FILE=true</code>{" "}
             ile <code className="font-mono text-xs">data/home-content.json</code> kullanın. Aksi halde anasayfa{" "}
             <code className="font-mono text-xs">lib/home-content.ts</code> varsayılanını gösterir.
@@ -359,7 +402,7 @@ export function AdminDashboard() {
           <AdminNewsEditor
             initialItems={homeNews}
             canSave={homeContentCanSave}
-            fromRedis={homeNewsOverridden}
+            hasPersistedOverride={homeNewsOverridden}
             onSaved={() => void load()}
           />
         ) : null}
@@ -369,8 +412,8 @@ export function AdminDashboard() {
             className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-5 py-4 text-sm text-[var(--foreground)]"
             role="status"
           >
-            <strong className="font-semibold">İçerik kaydı gerekli.</strong> Blog yazılarını kaydetmek için Redis (
-            <code className="font-mono text-xs">UPSTASH_*</code>) veya{" "}
+            <strong className="font-semibold">İçerik kaydı gerekli.</strong> Blog yazılarını kaydetmek için Supabase
+            veya{" "}
             <code className="rounded bg-black/10 px-1 font-mono text-xs dark:bg-white/10">HOME_CONTENT_FILE=true</code>.
           </div>
         ) : null}
@@ -379,27 +422,119 @@ export function AdminDashboard() {
           <AdminBlogEditor
             initialItems={homeBlog}
             canSave={homeContentCanSave}
-            fromRedis={homeBlogOverridden}
+            hasPersistedOverride={homeBlogOverridden}
             onSaved={() => void load()}
           />
+        ) : null}
+
+        {activeTab === "uyeler" && membersFetchError ? (
+          <div
+            className="rounded-2xl border border-red-500/35 bg-red-500/10 px-5 py-4 text-sm text-[var(--foreground)]"
+            role="alert"
+          >
+            <strong className="font-semibold">Üye listesi.</strong> {membersFetchError}
+          </div>
         ) : null}
 
         {activeTab === "uyeler" ? (
           <>
             <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+              <h2 className="text-lg font-semibold">Web sitesi üyelik başvuruları</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                <code className="rounded bg-black/10 px-1 font-mono text-xs dark:bg-white/10">/kayit</code> formundan
+                gelen başvurular Supabase&apos;te <strong>membership_applications</strong> tablosuna ve uygun
+                kayıtlarda <strong>members</strong> tablosuna (incelemede) yazılır.
+              </p>
+              {!siteApplicationsOk ? (
+                <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">
+                  Supabase yapılandırılmadıysa başvurular kaydedilmez.
+                </p>
+              ) : siteApplications.length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--muted)]">Henüz kuyrukta başvuru yok (veya liste boş).</p>
+              ) : (
+                <ul className="mt-4 max-h-72 space-y-3 overflow-y-auto text-sm">
+                  {siteApplications.map((item, idx) => {
+                    if (!item || typeof item !== "object" || "_parseError" in (item as object)) {
+                      return (
+                        <li
+                          key={`bad-${idx}`}
+                          className="rounded-lg border border-[var(--card-border)] bg-[var(--card-elevated)] px-3 py-2 text-[var(--muted)]"
+                        >
+                          Okunamayan kayıt
+                        </li>
+                      );
+                    }
+                    const o = item as Record<string, unknown>;
+                    const fullName = typeof o.fullName === "string" ? o.fullName : "—";
+                    const email = typeof o.email === "string" ? o.email : "";
+                    const sector = typeof o.sector === "string" ? o.sector : "";
+                    const submittedAt = typeof o.submittedAt === "string" ? o.submittedAt : "";
+                    return (
+                      <li
+                        key={`${submittedAt}-${idx}`}
+                        className="rounded-lg border border-[var(--card-border)] bg-[var(--card-elevated)] px-3 py-2"
+                      >
+                        <div className="font-medium text-[var(--foreground)]">{fullName}</div>
+                        <div className="mt-0.5 text-xs text-[var(--muted)]">
+                          {submittedAt ? new Date(submittedAt).toLocaleString("tr-TR") : "—"}
+                          {email ? ` · ${email}` : null}
+                        </div>
+                        {sector ? <div className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">{sector}</div> : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
               <h2 className="text-lg font-semibold">Üye yayımlama durumu</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                <strong>Onaylı</strong> kayıtlar kamuya açık üye kataloğunda listelenir. <strong>İncelemede</strong> ve{" "}
-                <strong>Reddedildi</strong> statülerindeki kayıtlar yayından alınır. Kaynak elektronik tablo
-                güncellendikten sonra kayıtlar için uygun statüyü atayınız.
+                <strong>Onaylı</strong> kayıtlar kamuya açık katalogda listelenir. <strong>İncelemede</strong> ve{" "}
+                <strong>Reddedildi</strong> yayındadır. <strong>Düzenle</strong> alanları veritabanında günceller.{" "}
+                <strong>Sil</strong> kaydı siteden gizler (satır silinmez).
               </p>
-              <input
-                type="search"
-                value={memberFilter}
-                onChange={(e) => setMemberFilter(e.target.value)}
-                placeholder="Ad, sektör veya marka ara…"
-                className="mt-4 w-full rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 text-sm outline-none ring-[var(--accent)] focus:ring-2 sm:max-w-md"
-              />
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                <input
+                  type="search"
+                  value={memberFilter}
+                  onChange={(e) => setMemberFilter(e.target.value)}
+                  placeholder="Ad, sektör veya marka ara…"
+                  className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 text-sm outline-none ring-[var(--accent)] focus:ring-2 sm:max-w-md"
+                  aria-label="Üye ara"
+                />
+                {memberFilter.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => setMemberFilter("")}
+                    className="shrink-0 rounded-full border border-[var(--card-border)] px-4 py-2 text-xs font-medium text-[var(--foreground)] hover:border-[var(--accent)]"
+                  >
+                    Aramayı temizle
+                  </button>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                <span className="font-medium text-[var(--foreground)]">{filteredMembers.length}</span> kayıt
+                gösteriliyor
+                {memberFilter.trim() ? (
+                  <>
+                    {" "}
+                    (filtre nedeniyle; toplam <span className="text-[var(--foreground)]">{members.length}</span>{" "}
+                    kayıt)
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    (toplam <span className="text-[var(--foreground)]">{members.length}</span>)
+                  </>
+                )}
+                .
+                {memberFilter.trim() && filteredMembers.length < members.length ? (
+                  <span className="ml-1 text-amber-600 dark:text-amber-400">
+                    Tüm üyeleri görmek için aramayı boşaltın.
+                  </span>
+                ) : null}
+              </p>
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[720px] border-collapse text-left text-sm">
                   <thead>
@@ -407,7 +542,7 @@ export function AdminDashboard() {
                       <th className="py-2 pr-4 font-semibold">Üye</th>
                       <th className="py-2 pr-4 font-semibold">Sektör</th>
                       <th className="py-2 pr-4 font-semibold">Yayımlama statüsü</th>
-                      <th className="py-2 font-semibold">Statü işlemleri</th>
+                      <th className="py-2 font-semibold">İşlemler</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -439,11 +574,33 @@ export function AdminDashboard() {
                         </td>
                         <td className="py-2 align-top">
                           <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              disabled={!storageOk}
+                              onClick={() => {
+                                setEditMemberKey(m.key);
+                                setEditMemberInitial({
+                                  fullName: m.fullName,
+                                  sector: m.sector,
+                                  brand: m.brand,
+                                  materials: m.materials,
+                                  location: m.location,
+                                  contact: m.contact,
+                                  digitalContact: m.digitalContact,
+                                  reference: m.reference,
+                                  rank: m.rank,
+                                });
+                              }}
+                              className="rounded-lg border border-[var(--accent)]/50 bg-[var(--accent)]/10 px-2 py-1 text-xs font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-45"
+                              title="Katalogda görünen alanları düzenle"
+                            >
+                              Düzenle
+                            </button>
                             {(["approved", "pending", "rejected"] as const).map((s) => (
                               <button
                                 key={s}
                                 type="button"
-                                disabled={busyKey === m.key || !redis || m.approval === s}
+                                disabled={busyKey === m.key || !storageOk || m.approval === s}
                                 onClick={() => void setApproval(m.key, s)}
                                 className="rounded-lg border border-[var(--card-border)] px-2 py-1 text-xs font-medium transition hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-45"
                                 title={m.approval === s ? "Bu statü zaten atanmış" : undefined}
@@ -451,6 +608,20 @@ export function AdminDashboard() {
                                 {s === "approved" ? "Onayla" : s === "pending" ? "İncelemeye al" : "Reddet"}
                               </button>
                             ))}
+                            <button
+                              type="button"
+                              disabled={busyKey === m.key || !storageOk}
+                              onClick={() =>
+                                void removeMemberFromSite(
+                                  m.key,
+                                  m.fullName.trim() || m.brand.trim() || m.sector.trim() || m.contact.trim(),
+                                )
+                              }
+                              className="rounded-lg border border-red-500/40 bg-red-500/5 px-2 py-1 text-xs font-medium text-red-700 transition hover:border-red-500/70 dark:text-red-400 dark:hover:border-red-400 disabled:cursor-not-allowed disabled:opacity-45"
+                              title="Listeden ve katalogdan kaldırır; veritabanı satırı silinmez"
+                            >
+                              Sil
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -465,7 +636,19 @@ export function AdminDashboard() {
               ) : null}
             </section>
 
-            {stats?.redisConfigured ? (
+            <MemberEditModal
+              open={editMemberKey !== null}
+              lineageKey={editMemberKey}
+              initial={editMemberInitial}
+              storageReady={storageOk}
+              onClose={() => {
+                setEditMemberKey(null);
+                setEditMemberInitial(null);
+              }}
+              onSaved={() => void load()}
+            />
+
+            {stats?.supabaseConfigured ? (
               <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
                 <h2 className="text-lg font-semibold">Üyelik başvurusu — günlük tıklama</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
@@ -517,7 +700,7 @@ export function AdminDashboard() {
               </div>
             </section>
 
-            {stats.redisConfigured ? (
+            {stats.supabaseConfigured ? (
               <>
                 <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
                   <h2 className="text-lg font-semibold">Günlük sayfa görüntülenmesi (on dört gün, UTC)</h2>
@@ -596,145 +779,67 @@ export function AdminDashboard() {
         {activeTab === "sistem" ? (
           <>
             <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
-              <h2 className="text-lg font-semibold">Google Sheets — üye veritabanı</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Üye listesi bu tablodan okunur. <strong>Servis hesabı JSON</strong> ile Google Sheets API kullanılır (özel
-            tablolar için önerilir); tabloyu servis hesabı e-postası ile <strong>paylaşmanız</strong> gerekir (
-            <span className="font-mono text-xs">Düzenleyici</span> veya{" "}
-            <span className="font-mono text-xs">Görüntüleyici</span>
-            ). Anahtar yoksa, tablo <strong>herkese bağlantıyla yayınlanmış</strong> olmalıdır (eski CSV dışa aktarım
-            yolu).
-          </p>
-          {googleView ? (
-            <div className="mt-3 rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)]/50 px-4 py-3 text-xs text-[var(--foreground)]">
-              <p className="font-medium text-[var(--muted)]">Geçerli okuma modu</p>
-              <p className="mt-1">
-                {googleView.fetchMode === "api" ? (
-                  <span className="text-emerald-600 dark:text-emerald-400">
-                    Google Sheets API (kimlik doğrulamalı)
-                  </span>
-                ) : googleView.fetchMode === "public_csv" ? (
-                  <span className="text-amber-600 dark:text-amber-400">Herkese açık CSV dışa aktarımı</span>
-                ) : (
-                  <span className="text-red-600 dark:text-red-400">Tablo kimliği tanımlı değil</span>
-                )}
+              <h2 className="text-lg font-semibold">Supabase — veri kaynağı</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Üyeler, başvurular, logo URL&apos;si, anasayfa haber/blog içeriği ve özet analitik{" "}
+                <strong>Postgres</strong> üzerinden tutulur. Şema için
+                projedeki <code className="font-mono text-xs">supabase/migrations/001_initial.sql</code> dosyasını
+                Supabase SQL düzenleyicide çalıştırın.
               </p>
-              {googleView.sheetIdEffective ? (
-                <p className="mt-2 break-all font-mono text-[var(--muted)]">
-                  Etkin sayfa kimliği: {googleView.sheetIdEffective} · sekme (gid): {googleView.gidEffective}
+            </section>
+
+            <section className="rounded-2xl border border-red-500/25 bg-red-500/[0.06] p-6 dark:bg-red-500/5">
+              <h2 className="text-lg font-semibold">Üye onay ve gizleme durumunu sıfırla</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Tüm kayıtlar <strong>onaylı</strong> yapılır ve <strong>gizlenen</strong> işaretleri kaldırılır. Alan
+                metinleri değişmez.
+              </p>
+              <button
+                type="button"
+                disabled={!storageOk}
+                onClick={() => void resetMemberOverlay()}
+                className="mt-4 rounded-full border border-red-500/50 bg-red-500/10 px-6 py-3 text-sm font-semibold text-red-800 transition hover:bg-red-500/20 disabled:opacity-50 dark:text-red-300"
+              >
+                Onay ve gizlemeyi sıfırla
+              </button>
+            </section>
+
+            <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+              <h2 className="text-lg font-semibold">Kurumsal logo (URL)</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                <strong className="text-[var(--foreground)]">Üye kataloğu</strong> üstündeki logo bu HTTPS adresinden
+                yüklenir. Boş bırakırsanız yerel varsayılan (
+                <code className="font-mono text-xs">/turk-tudun-logo.png</code>) kullanılır.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="flex flex-1 flex-col gap-2 text-sm font-medium">
+                  Görsel adresi (HTTPS)
+                  <input
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="https://…"
+                    className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 font-normal text-[var(--foreground)] outline-none ring-[var(--accent)] focus:ring-2"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void saveLogo()}
+                  disabled={!storageOk}
+                  className="rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  Uygula
+                </button>
+              </div>
+              {logoSaved ? (
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  Geçerli özel adres: <span className="break-all font-mono">{logoSaved}</span>
                 </p>
-              ) : null}
-              {(googleView.serviceAccountEmail || googleView.serviceAccountEnvEmail) && (
-                <p className="mt-2 text-[var(--muted)]">
-                  Servis hesabı:{" "}
-                  <span className="font-mono text-[var(--foreground)]">
-                    {googleView.serviceAccountEmail ?? googleView.serviceAccountEnvEmail}
-                  </span>
-                  {googleView.hasServiceAccountInEnv && googleView.hasServiceAccountInRedis ? (
-                    <span className="ml-2 text-[var(--muted)]">(Redis öncelikli)</span>
-                  ) : null}
-                  {googleView.hasServiceAccountInEnv && !googleView.hasServiceAccountInRedis ? (
-                    <span className="ml-2 text-[var(--muted)]">(ortam değişkeni)</span>
-                  ) : null}
+              ) : (
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  Kayıtlı adres yok — katalogda yerleşik logo kullanılır.
                 </p>
               )}
-            </div>
-          ) : null}
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              E-tablo kimliği (spreadsheet ID)
-              <input
-                value={googleSheetId}
-                onChange={(e) => setGoogleSheetId(e.target.value)}
-                placeholder="URL içindeki /d/ ile /edit arası"
-                className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 font-normal text-[var(--foreground)] outline-none ring-[var(--accent)] focus:ring-2"
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              Sekme gid (sayfa kimliği)
-              <input
-                value={googleGid}
-                onChange={(e) => setGoogleGid(e.target.value)}
-                placeholder="Örn. 0"
-                className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 font-normal text-[var(--foreground)] outline-none ring-[var(--accent)] focus:ring-2"
-              />
-            </label>
-          </div>
-          <label className="mt-4 flex flex-col gap-2 text-sm font-medium">
-            Servis hesabı anahtarı (JSON)
-            <textarea
-              value={googleSaPaste}
-              onChange={(e) => setGoogleSaPaste(e.target.value)}
-              rows={5}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder='Google Cloud → IAM → servis hesabı anahtarı JSON. Yalnızca değiştirirken yapıştırın; boş bırakınca mevcut Redis kaydı korunur.'
-              className="resize-y rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 font-mono text-xs text-[var(--foreground)] outline-none ring-[var(--accent)] focus:ring-2 sm:text-sm"
-            />
-          </label>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={!redis || googleSaving}
-              onClick={() => void saveGoogleSheetSettings()}
-              className="rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-black disabled:opacity-50"
-            >
-              {googleSaving ? "Kaydediliyor…" : "Ayarları kaydet"}
-            </button>
-            <button
-              type="button"
-              disabled={!redis || googleSaving || !googleView?.hasServiceAccountInRedis}
-              onClick={() => void clearGoogleServiceAccount()}
-              className="rounded-full border border-[var(--card-border)] px-6 py-3 text-sm font-medium hover:border-red-500/50 disabled:opacity-50"
-            >
-              Redis anahtarını sil
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-[var(--muted)]">
-            Tablo kimliğini boş kaydederseniz Redis üzerindeki sayfa/gid kaldırılır; uygulama yalnızca barındırıcıdaki{" "}
-            <code className="rounded bg-black/10 px-1 font-mono dark:bg-white/10">GOOGLE_SHEET_ID</code> değişkenine
-            bakar. İsteğe bağlı ortam değişkeni:{" "}
-            <code className="rounded bg-black/10 px-1 font-mono dark:bg-white/10">GOOGLE_SERVICE_ACCOUNT_JSON</code>{" "}
-            (tek satır JSON).
-          </p>
-        </section>
-
-        <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
-          <h2 className="text-lg font-semibold">Kurumsal logo (URL)</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Yayındaki sitede varsayılan görsel{" "}
-            <code className="font-mono text-xs">/logo.png</code> dosyasıdır. Özel adres kullanımı için barındırıcı
-            ortamında{" "}
-            <code className="font-mono text-xs">USE_STORED_SITE_LOGO=true</code> tanımlanmalıdır. Alanın
-            boşaltılması Redis kaydını siler.
-          </p>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="flex flex-1 flex-col gap-2 text-sm font-medium">
-              Görsel adresi (HTTPS)
-              <input
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://…"
-                className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 font-normal text-[var(--foreground)] outline-none ring-[var(--accent)] focus:ring-2"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => void saveLogo()}
-              disabled={!redis}
-              className="rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-black disabled:opacity-50"
-            >
-              Uygula
-            </button>
-          </div>
-          {logoSaved ? (
-            <p className="mt-2 text-xs text-[var(--muted)]">
-              Geçerli özel adres: <span className="break-all font-mono">{logoSaved}</span>
-            </p>
-          ) : (
-            <p className="mt-2 text-xs text-[var(--muted)]">Geçerli görsel: varsayılan /logo.png</p>
-          )}
-        </section>
+            </section>
           </>
         ) : null}
       </main>

@@ -1,39 +1,42 @@
-# Vercel dağıtımı — Türk Tudun kataloğu
+# Vercel dağıtımı — Türk Tudun
 
-## Gerekenler
+## Önkoşul: Supabase
 
-1. **Google Form → E-Tablo**: Form sahibi olarak [Yanıtlar] → **E-Tabloda görüntüle** ile yanıtları bir Google E-Tabloya bağlayın.
-2. **Okuma erişimi**: Uygulama tabloyu CSV olarak indirir. Tabloyu en az **Bağlantısı olan herkes görüntüleyebilir** (veya herkese açık görüntüleme) yapın; aksi halde Vercel ortamında `fetch` boş veya hata döner ve site yalnızca `data/seed-members.json` içeriğini gösterir.
-3. **Kimlikleri kopyalayın**: E-tablo URL’sindeki `.../d/<SHEET_ID>/...` değerini `GOOGLE_SHEET_ID` olarak kullanın. Başka bir sayfa sekmesiyse URL’deki `gid=...` değerini `GOOGLE_SHEET_GID` olarak ayarlayın.
+1. [Supabase](https://supabase.com) projesi oluşturun.
+2. Repodaki `supabase/migrations/001_initial.sql` dosyasını **SQL Editor**’da çalıştırın.
+3. **Settings → API** bölümünden proje URL’si ve anahtarları alın.
 
 ## Vercel ortam değişkenleri
 
-Projeyi içe aktarın; **Settings → Environment Variables** altında örnek için [.env.example](.env.example) dosyasına bakın:
+**Settings → Environment Variables** — ayrıntılı şablon: [.env.example](.env.example)
 
 | Değişken | Zorunlu | Açıklama |
 |----------|---------|----------|
-| `GOOGLE_SHEET_ID` | Hayır* | Boşsa yalnızca seed JSON listelenir. |
-| `GOOGLE_SHEET_GID` | Hayır | Varsayılan `0`. |
-| `CACHE_REVALIDATE_SECONDS` | Hayır | CSV önbelleği (ISR), varsayılan 120. |
-| `REVALIDATE_SECRET` | Hayır | Anında yenileme endpoint’i için. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Evet | Supabase proje URL’si |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Evet | İstemci / Auth (yayımlanabilir anahtar) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Evet* | Sunucu: üyeler, ayarlar, analitik, içerik yazma |
+| `ADMIN_PASSWORD` | Panel için | Yönetim girişi |
+| `ADMIN_SESSION_SECRET` | Panel için | ≥16 karakter, oturum imzası |
+| `CACHE_REVALIDATE_SECONDS` | Hayır | ISR, varsayılan 120 |
+| `REVALIDATE_SECRET` | Hayır | `/api/revalidate` için |
+
+\* Üretimde `SUPABASE_SERVICE_ROLE_KEY` olmadan katalog ve panel verisi çalışmaz; bu anahtarı yalnızca sunucu ortamında tutun.
 
 ## Anında sayfa yenileme (isteğe bağlı)
-
-Google Apps Script veya benzeri ile form gönderiminde şunu çağırabilirsiniz:
 
 ```http
 POST https://<proje>.vercel.app/api/revalidate?secret=<REVALIDATE_SECRET>
 ```
 
-`REVALIDATE_SECRET` ile aynı değeri Vercel’de tanımlayın.
+## Yönetim paneli
 
-## Yönetim paneli (`/admin`)
-
-1. **Şifre ve oturum**: `ADMIN_PASSWORD` ve en az 16 karakter `ADMIN_SESSION_SECRET` tanımlayın.
-2. **Giriş**: `/admin/login` — başarılı girişten sonra `/admin` kontrol paneli.
-3. **Analitik, logo URL ve üye onayları** kalıcı olması için **Upstash Redis** önerilir: `UPSTASH_REDIS_REST_URL` ve `UPSTASH_REDIS_REST_TOKEN`. Redis yoksa giriş yine çalışır; sayaçlar ve ayarlar tutulmaz.
-4. **Logo**: Ana sayfa varsayılan olarak `public/logo.png` kullanır. Paneldeki URL ancak `USE_STORED_SITE_LOGO=true` iken geçerlidir (aksi halde Redis’teki eski dış adres yüzünden parşömen kare görünebilir).
+`/admin/login` → `ADMIN_PASSWORD` ile giriş. Logo, üye onayları, haber/blog ve özet istatistikler Supabase üzerinden saklanır.
 
 ## Yerel geliştirme
 
-`.env.local` oluşturup `.env.example` içeriğini kopyalayın; `GOOGLE_SHEET_ID` doldurun. `npm run dev` ile çalıştırın.
+`.env.local` oluşturun ([.env.example](.env.example)). İsteğe bağlı: `HOME_CONTENT_FILE=true` ile haber/blog’u `data/home-content.json` içinde tutabilirsiniz (üretimde Supabase tercih edilir).
+
+```bash
+npm install
+npm run dev
+```

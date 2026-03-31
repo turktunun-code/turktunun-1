@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { DemandChatbot } from "@/components/DemandChatbot";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TAGLINE } from "@/lib/constants";
 
@@ -8,24 +10,31 @@ const HERO_SRC = "/welcome/hero.png";
 const DEVELOPER_SITE = "https://www.dogukankardas.com";
 
 export function WelcomeEntry() {
+  const [heroBroken, setHeroBroken] = useState(false);
+
   return (
     <div className="relative min-h-dvh min-h-screen w-full overflow-hidden bg-[#0a1210] text-[var(--foreground)]">
       <div className="absolute inset-0">
-        <img
-          src={HERO_SRC}
-          alt="Türk Tudun: tarihî ticaret hanı ve kurumsal mühür illüstrasyonu"
-          decoding="async"
-          fetchPriority="high"
-          className="h-full w-full object-cover object-center"
-        />
+        {heroBroken ? (
+          <div className="h-full w-full bg-gradient-to-br from-[#1a2220] via-[#0d1614] to-[#061015]" aria-hidden />
+        ) : (
+          <img
+            src={HERO_SRC}
+            alt="Türk Tudun: tarihî ticaret hanı ve kurumsal mühür illüstrasyonu"
+            decoding="async"
+            fetchPriority="high"
+            onError={() => setHeroBroken(true)}
+            className="h-full w-full object-cover object-center"
+          />
+        )}
       </div>
 
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0b1210]/55 via-[#0b1210]/15 to-[#061015]/92 dark:from-black/65 dark:via-black/25 dark:to-black/90"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0b1210]/30 via-transparent to-[#061015]/70 dark:from-black/35 dark:via-transparent dark:to-black/75"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_0%,transparent_20%,rgba(6,16,21,0.75)_100%)] dark:bg-[radial-gradient(ellipse_100%_70%_at_50%_0%,transparent_15%,rgba(0,0,0,0.55)_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_20%,transparent_35%,rgba(4,10,8,0.5)_100%)] dark:bg-[radial-gradient(ellipse_90%_65%_at_50%_15%,transparent_30%,rgba(0,0,0,0.45)_100%)]"
         aria-hidden
       />
 
@@ -76,6 +85,8 @@ export function WelcomeEntry() {
             </p>
           </div>
         </main>
+
+        <DemandChatbot />
 
         <footer className="relative z-10 space-y-2 px-4 py-4 text-center sm:px-8">
           <p className="text-[11px] sm:text-xs">

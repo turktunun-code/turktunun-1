@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { DemandChatbot } from "@/components/DemandChatbot";
 import { MemberHoverCard } from "@/components/MemberHoverCard";
-import { FORM_URL, TAGLINE } from "@/lib/constants";
+import { TAGLINE } from "@/lib/constants";
 import { memberDedupeKey, type Member } from "@/lib/member";
 import { recommendByDemand, tokenizeDemand } from "@/lib/recommendations";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -157,21 +157,7 @@ export function OnerilerClient({ members, initialDemand, initialSector }: Props)
       </section>
 
       <footer className="mt-auto border-t border-[var(--card-border)] bg-[var(--footer-bg)] py-6 text-center text-sm text-[var(--muted)] transition-colors">
-        © Türk Tudun. Başvurular web formu veya{" "}
-        <a
-          className="font-medium text-[var(--foreground)] underline decoration-[var(--accent)] underline-offset-4"
-          href={FORM_URL}
-        >
-          resmî Google Form
-        </a>{" "}
-        üzerinden kabul edilir.{" "}
-        <Link className="underline decoration-[var(--accent)] underline-offset-4" href="/kayit">
-          Üyelik başvurusu
-        </Link>
-        {" · "}
-        <Link className="underline decoration-[var(--accent)] underline-offset-4" href="/admin/login">
-          Yönetim paneli
-        </Link>
+        © Türk Tudun. Bu sayfa üye bilgi platformu niteliğindedir. Başvurular web formu üzerinden kabul edilir.
       </footer>
 
       <DemandChatbot sectorFilter={sector} />

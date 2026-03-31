@@ -7,11 +7,11 @@ import { ChatbotAvatar, type ChatbotAvatarPhase } from "@/components/ChatbotAvat
 type Msg = { role: "bot" | "user"; text: string };
 
 type Props = {
-  /** Ana sayfadaki sektör filtresi; talep sonuçlarına varsayılan olarak aktarılır */
-  sectorFilter: string;
+  /** Katalog / öneriler sayfasındaki sektör süzgeci; anasayfada genelde boş bırakılır */
+  sectorFilter?: string;
 };
 
-export function DemandChatbot({ sectorFilter }: Props) {
+export function DemandChatbot({ sectorFilter = "" }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -82,7 +82,8 @@ export function DemandChatbot({ sectorFilter }: Props) {
 
     const q = new URLSearchParams();
     q.set("demand", text);
-    if (sectorFilter.trim()) q.set("sector", sectorFilter.trim());
+    const sec = sectorFilter.trim();
+    if (sec) q.set("sector", sec);
     router.push(`/oneriler?${q.toString()}`);
     setOpen(false);
     setBusy(false);

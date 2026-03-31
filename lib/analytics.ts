@@ -1,24 +1,31 @@
-import { getRedis } from "./redis";
+import { getSupabaseAdmin } from "./supabase/admin";
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 export async function trackPageView(): Promise<void> {
-  const r = getRedis();
-  if (!r) return;
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
   const d = todayKey();
-  await r.incr(`pv:${d}`);
-  await r.incr("pv:total");
+  try {
+    await sb.rpc("analytics_increment", { p_category: "pv_day", p_field: d, p_delta: 1 });
+    await sb.rpc("analytics_increment", { p_category: "pv_total", p_field: "all", p_delta: 1 });
+  } catch (e) {
+    console.error("[analytics] pv", e);
+  }
 }
 
 export async function trackSectorPick(sector: string): Promise<void> {
   const s = sector.trim();
   if (s.length < 2) return;
-  const r = getRedis();
-  if (!r) return;
-  const field = s.slice(0, 240);
-  await r.hincrby("stats:sector_pick", field, 1);
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  try {
+    await sb.rpc("analytics_increment", { p_category: "sector_pick", p_field: s.slice(0, 240), p_delta: 1 });
+  } catch (e) {
+    console.error("[analytics] sector", e);
+  }
 }
 
 export async function trackSearchQuery(query: string): Promise<void> {
@@ -28,20 +35,28 @@ export async function trackSearchQuery(query: string): Promise<void> {
     .replace(/\s+/g, " ")
     .slice(0, 120);
   if (q.length < 2) return;
-  const r = getRedis();
-  if (!r) return;
-  await r.hincrby("stats:search_query", q, 1);
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  try {
+    await sb.rpc("analytics_increment", { p_category: "search_query", p_field: q, p_delta: 1 });
+  } catch (e) {
+    console.error("[analytics] search", e);
+  }
 }
 
 export async function trackFormCtaClick(): Promise<void> {
-  const r = getRedis();
-  if (!r) return;
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
   const d = todayKey();
-  await r.incr(`cta_form:${d}`);
+  try {
+    await sb.rpc("analytics_increment", { p_category: "cta_form", p_field: d, p_delta: 1 });
+  } catch (e) {
+    console.error("[analytics] cta", e);
+  }
 }
 
 export type AdminStats = {
-  redisConfigured: boolean;
+  supabaseConfigured: boolean;
   dailyPv: { date: string; count: number }[];
   topSectors: { name: string; count: number }[];
   topSearches: { term: string; count: number }[];
@@ -50,19 +65,18 @@ export type AdminStats = {
 };
 
 function lastNDates(n: number): string[] {
-  return [...Array(n)]
-    .map((_, i) => {
-      const d = new Date();
-      d.setUTCDate(d.getUTCDate() - (n - 1 - i));
-      return d.toISOString().slice(0, 10);
-    });
+  return [...Array(n)].map((_, i) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - (n - 1 - i));
+    return d.toISOString().slice(0, 10);
+  });
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
-  const r = getRedis();
-  if (!r) {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
     return {
-      redisConfigured: false,
+      supabaseConfigured: false,
       dailyPv: [],
       topSectors: [],
       topSearches: [],
@@ -73,36 +87,45 @@ export async function getAdminStats(): Promise<AdminStats> {
 
   const days = lastNDates(14);
 
-  const dailyPv = await Promise.all(
-    days.map(async (date) => {
-      const v = await r.get(`pv:${date}`);
-      return { date, count: Number(v ?? 0) };
-    }),
-  );
+  const { data: rows, error } = await sb.from("analytics_counters").select("category,field,value");
+  if (error) {
+    console.error("[analytics] stats", error.message);
+    return {
+      supabaseConfigured: true,
+      dailyPv: days.map((date) => ({ date, count: 0 })),
+      topSectors: [],
+      topSearches: [],
+      dailyCta: days.map((date) => ({ date, count: 0 })),
+      totalPv: 0,
+    };
+  }
 
-  const dailyCta = await Promise.all(
-    days.map(async (date) => {
-      const v = await r.get(`cta_form:${date}`);
-      return { date, count: Number(v ?? 0) };
-    }),
-  );
+  const map = new Map<string, number>();
+  for (const r of rows ?? []) {
+    map.set(`${r.category}\0${r.field}`, Number(r.value ?? 0));
+  }
 
-  const sectorEntries = await r.hgetall("stats:sector_pick");
-  const topSectors = Object.entries(sectorEntries ?? {})
-    .map(([name, count]) => ({ name, count: Number(count) }))
+  const get = (cat: string, field: string) => map.get(`${cat}\0${field}`) ?? 0;
+
+  const dailyPv = days.map((date) => ({ date, count: get("pv_day", date) }));
+  const dailyCta = days.map((date) => ({ date, count: get("cta_form", date) }));
+
+  const topSectors = (rows ?? [])
+    .filter((r) => r.category === "sector_pick")
+    .map((r) => ({ name: r.field as string, count: Number(r.value) }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
-  const searchEntries = await r.hgetall("stats:search_query");
-  const topSearches = Object.entries(searchEntries ?? {})
-    .map(([term, count]) => ({ term, count: Number(count) }))
+  const topSearches = (rows ?? [])
+    .filter((r) => r.category === "search_query")
+    .map((r) => ({ term: r.field as string, count: Number(r.value) }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
-  const totalPv = Number((await r.get("pv:total")) ?? 0);
+  const totalPv = get("pv_total", "all");
 
   return {
-    redisConfigured: true,
+    supabaseConfigured: true,
     dailyPv,
     topSectors,
     topSearches,

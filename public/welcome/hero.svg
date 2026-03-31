@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1c2e28"/>
+      <stop offset="35%" stop-color="#0f1f1c"/>
+      <stop offset="70%" stop-color="#0a1412"/>
+      <stop offset="100%" stop-color="#050a09"/>
+    </linearGradient>
+    <radialGradient id="lantern" cx="50%" cy="34%" r="55%">
+      <stop offset="0%" stop-color="#4ee8d8" stop-opacity="0.55"/>
+      <stop offset="25%" stop-color="#30D5C8" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#30D5C8" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ground" cx="50%" cy="100%" r="75%">
+      <stop offset="0%" stop-color="#081210"/>
+      <stop offset="100%" stop-color="#020403"/>
+    </radialGradient>
+    <linearGradient id="archStone" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#152220"/>
+      <stop offset="100%" stop-color="#0a1210"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <rect width="1920" height="1080" fill="url(#lantern)"/>
+  <rect width="1920" height="520" y="560" fill="url(#ground)" opacity="0.85"/>
+
+  <!-- Yıldızlar -->
+  <g fill="#ffffff" opacity="0.35">
+    <circle cx="120" cy="80" r="1.2"/><circle cx="280" cy="140" r="0.9"/><circle cx="400" cy="60" r="1"/>
+    <circle cx="580" cy="110" r="0.8"/><circle cx="720" cy="45" r="1.1"/><circle cx="890" cy="95" r="0.7"/>
+    <circle cx="1050" cy="55" r="1"/><circle cx="1180" cy="125" r="0.85"/><circle cx="1320" cy="70" r="1"/>
+    <circle cx="1480" cy="100" r="0.75"/><circle cx="1620" cy="50" r="1.1"/><circle cx="1780" cy="130" r="0.9"/>
+    <circle cx="200" cy="220" r="0.8"/><circle cx="450" cy="180" r="1"/><circle cx="650" cy="250" r="0.6"/>
+    <circle cx="920" cy="200" r="0.9"/><circle cx="1100" cy="230" r="0.7"/><circle cx="1400" cy="190" r="1"/>
+    <circle cx="1680" cy="210" r="0.85"/><circle cx="240" cy="320" r="0.7"/><circle cx="1560" cy="300" r="0.8"/>
+  </g>
+
+  <!-- Uzak siluet tepeler -->
+  <path fill="#0c1816" opacity="0.9" d="M0,620 C280,560 420,590 640,540 C880,485 1040,505 1280,545 C1480,580 1680,530 1920,600 L1920,1080 L0,1080 Z"/>
+
+  <!-- Ticaret hanı cephesi — kemerler -->
+  <g fill="url(#archStone)">
+    <path d="M0,1080 L0,640 L220,640 L220,1080 Z"/>
+    <path d="M1720,640 L1920,640 L1920,1080 L1720,1080 Z"/>
+    <!-- Orta gövde -->
+    <path d="M220,1080 L220,600 C380,480 520,520 640,590 L640,1080 Z"/>
+    <path d="M1280,1080 L1280,590 C1400,520 1540,480 1700,600 L1700,1080 Z"/>
+    <rect x="640" y="560" width="640" height="520"/>
+  </g>
+
+  <!-- Kemer boşlukları (daha koyu) -->
+  <g fill="#050807">
+    <path d="M 380 1080 L 380 760 A 130 200 0 0 1 640 760 L 640 1080 Z"/>
+    <path d="M 1280 1080 L 1280 760 A 130 200 0 0 0 1540 760 L 1540 1080 Z"/>
+    <path d="M 800 1080 L 800 700 A 160 240 0 0 1 1120 700 L 1120 1080 Z"/>
+  </g>
+
+  <!-- Kemer hatları (turkuaz vurgu) -->
+  <g fill="none" stroke="#30D5C8" stroke-opacity="0.35" stroke-width="2">
+    <path d="M 380 760 A 130 200 0 0 1 640 760"/>
+    <path d="M 1280 760 A 130 200 0 0 0 1540 760"/>
+    <path d="M 800 700 A 160 240 0 0 1 1120 700"/>
+  </g>
+
+  <!-- Üst saçak silueti -->
+  <path fill="#0a1614" d="M160,520 C440,440 620,460 960,480 C1300,460 1480,440 1760,520 L1760,600 C1500,540 1200,520 960,530 C720,520 420,540 160,600 Z"/>
+
+  <!-- Mühür / rozet dekoru (sağ üst) -->
+  <g transform="translate(1410,180)" opacity="0.5">
+    <circle r="118" fill="none" stroke="#30D5C8" stroke-width="3" stroke-opacity="0.45"/>
+    <circle r="95" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.12"/>
+    <circle r="68" fill="none" stroke="#30D5C8" stroke-width="1.5" stroke-opacity="0.3"/>
+    <path fill="#30D5C8" fill-opacity="0.12" d="M0,-52 L12,-16 L50,-16 L20,8 L32,44 L0,22 L-32,44 L-20,8 L-50,-16 L-12,-16 Z"/>
+  </g>
+
+  <!-- Sol orta halka (derinlik) -->
+  <circle cx="420" cy="380" r="220" fill="none" stroke="#30D5C8" stroke-width="1.5" stroke-opacity="0.12"/>
+  <circle cx="420" cy="380" r="280" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.05"/>
+</svg>

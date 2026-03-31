@@ -1,4 +1,4 @@
--- Türk Tudun: Redis + Google Sheets yerine tek kaynak (Supabase Postgres)
+-- Türk Tudun: üye ve site verisi için Supabase Postgres
 -- Supabase SQL Editor'da veya: supabase db push
 
 create extension if not exists "pgcrypto";

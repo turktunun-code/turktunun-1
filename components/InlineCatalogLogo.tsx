@@ -5,7 +5,7 @@ import { useId } from "react";
 type Props = { className?: string; "aria-hidden"?: boolean };
 
 /**
- * `public` dosyasına bağlı kalmadan gösterilir — CDN/önbellek veya bozuk Redis URL olsa bile çalışır.
+ * Yerleşik SVG yedek; özel logo adresi yüklenemezse kullanılır.
  */
 export function InlineCatalogLogo({ className = "", ...rest }: Props) {
   const uid = useId().replace(/:/g, "");

@@ -309,7 +309,7 @@ function parseReferenceRows(raw: string): { label: string; value: string }[] {
   const parts = t.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean);
   const out: { label: string; value: string }[] = [];
   for (const part of parts) {
-    const kv = /^([^:|]{1,56}):\s*(.+)$/su.exec(part);
+    const kv = /^([^:|]{1,56}):\s*([\s\S]+)$/.exec(part);
     if (kv) {
       out.push({
         label: normalizeReferenceFieldLabel(kv[1]),

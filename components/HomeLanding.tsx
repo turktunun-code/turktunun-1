@@ -6,6 +6,7 @@ import type { HomeBlogItem, HomeNewsItem } from "@/lib/home-content";
 import { DemandChatbot } from "@/components/DemandChatbot";
 import { TAGLINE } from "@/lib/constants";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { trackMembershipFormCta } from "@/lib/track-membership-cta";
 
 const HERO_SRC = "/welcome/hero.png";
 
@@ -48,6 +49,7 @@ export function HomeLanding({ initialNews, initialBlog }: Props) {
             <Link
               href="/kayit"
               className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-black transition hover:brightness-95 sm:text-sm"
+              onClick={() => trackMembershipFormCta()}
             >
               Üyelik başvurusu
             </Link>

@@ -1,7 +1,10 @@
 import { getSupabaseAdmin } from "./supabase/admin";
 
+const ISTANBUL_TZ = "Europe/Istanbul";
+
+/** Günlük sayaç anahtarı — Türkiye takvimi (UTC gece kayması yok). */
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString("en-CA", { timeZone: ISTANBUL_TZ });
 }
 
 export async function trackPageView(): Promise<void> {
@@ -64,12 +67,27 @@ export type AdminStats = {
   totalPv: number;
 };
 
+/** En eski → bugün (İstanbul), YYYY-MM-DD — `todayKey` ile aynı takvim. */
 function lastNDates(n: number): string[] {
-  return [...Array(n)].map((_, i) => {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() - (n - 1 - i));
-    return d.toISOString().slice(0, 10);
-  });
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ISTANBUL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  let y = Number(parts.find((p) => p.type === "year")?.value);
+  let m = Number(parts.find((p) => p.type === "month")?.value);
+  let day = Number(parts.find((p) => p.type === "day")?.value);
+
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    out.unshift(`${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+    const prev = new Date(Date.UTC(y, m - 1, day - 1));
+    y = prev.getUTCFullYear();
+    m = prev.getUTCMonth() + 1;
+    day = prev.getUTCDate();
+  }
+  return out;
 }
 
 export async function getAdminStats(): Promise<AdminStats> {

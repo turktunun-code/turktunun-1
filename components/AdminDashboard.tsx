@@ -652,7 +652,8 @@ export function AdminDashboard() {
               <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
                 <h2 className="text-lg font-semibold">Üyelik başvurusu — günlük tıklama</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  Kamuya açık sitede «Üyelik başvurusu» çağrı öğesine yapılan tıklamalar.
+                  Kamuya açık sitede «Üyelik başvurusu» çağrı öğesine yapılan tıklamalar. Tarihler İstanbul
+                  takvimine göredir.
                 </p>
                 <div className="mt-4 space-y-2">
                   {stats.dailyCta.map((d) => (
@@ -678,10 +679,14 @@ export function AdminDashboard() {
               </div>
               <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Bugün (UTC) görüntülenme
+                  Bugün (İstanbul) görüntülenme
                 </p>
                 <p className="mt-2 text-3xl font-bold tabular-nums">
-                  {stats.dailyPv.find((d) => d.date === new Date().toISOString().slice(0, 10))?.count ?? 0}
+                  {stats.dailyPv.find(
+                    (d) =>
+                      d.date ===
+                      new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }),
+                  )?.count ?? 0}
                 </p>
               </div>
               <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-5">
@@ -703,7 +708,7 @@ export function AdminDashboard() {
             {stats.supabaseConfigured ? (
               <>
                 <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
-                  <h2 className="text-lg font-semibold">Günlük sayfa görüntülenmesi (on dört gün, UTC)</h2>
+                  <h2 className="text-lg font-semibold">Günlük sayfa görüntülenmesi (on dört gün, İstanbul)</h2>
                   <div className="mt-6 space-y-2">
                     {stats.dailyPv.map((d) => (
                       <div key={d.date} className="flex items-center gap-3 text-sm">

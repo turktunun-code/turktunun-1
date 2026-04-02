@@ -5,6 +5,7 @@ import { useState } from "react";
 import { DemandChatbot } from "@/components/DemandChatbot";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TAGLINE } from "@/lib/constants";
+import { trackMembershipFormCta } from "@/lib/track-membership-cta";
 
 const HERO_SRC = "/welcome/hero.png";
 const DEVELOPER_SITE = "https://www.dogukankardas.com";
@@ -66,6 +67,7 @@ export function WelcomeEntry() {
               <Link
                 href="/kayit"
                 className="flex items-center justify-center rounded-2xl border border-white/35 bg-white/10 py-3.5 text-center text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/18 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                onClick={() => trackMembershipFormCta()}
               >
                 Üyelik başvurusu
               </Link>

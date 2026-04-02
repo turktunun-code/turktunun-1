@@ -8,6 +8,7 @@ import { MemberHoverCard } from "@/components/MemberHoverCard";
 import { DEFAULT_CATALOG_LOGO, TAGLINE } from "@/lib/constants";
 import { memberDedupeKey, type Member } from "@/lib/member";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { trackMembershipFormCta } from "@/lib/track-membership-cta";
 
 type Props = {
   members: Member[];
@@ -200,13 +201,7 @@ export function CatalogClient({ members, logoSrc }: Props) {
             <Link
               href="/kayit"
               className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] px-8 text-sm font-semibold text-black shadow-sm transition hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] dark:text-black dark:hover:brightness-110"
-              onClick={() => {
-                void fetch("/api/analytics", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ type: "form_cta" }),
-                });
-              }}
+              onClick={() => trackMembershipFormCta()}
             >
               Üyelik başvurusu
             </Link>
